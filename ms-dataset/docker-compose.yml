@@ -5,9 +5,10 @@ services:
     environment:
       - GIN_MODE=release
       - BNB_PORT=8080
-      - BNB-PROJECT-ID=mr-bonobo
-      - BNB-NAME=mr-bonobo-dev
-      - BNB-FIREBASE-CONFIG=./secret/config-firebase.json
+      - BNB_NAME=mr-bonobo-dev
+      - BNB_PROJECT_ID=mr-bonobo
+      - BNB_DATABASE_URL=https://mr-bonobo.firebaseio.com
+      - BNB_STORAGE_URL=mr-bonobo.appspot.com
       - GOOGLE_APPLICATION_CREDENTIALS=./secret/credentials-firebase.json
     ports:
       - '8080:8080'
