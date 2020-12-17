@@ -1,0 +1,8 @@
+**/node_modules/
+**/vendor/
+**/.dataset/
+**/.model/
+**/.vscode/
+**/secret/
+**/dist_electron/
+**/docker-compose.yml

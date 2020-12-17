@@ -1,0 +1,26 @@
+GET http://127.0.0.1:8080/v1/dataset/create/spreadsheet/1mN5MR4zrEcn0rFMtFySsWf1Cdc2Xoxy5lil_l3IA-Vo
+###
+GET http://127.0.0.1:8080/v1/dataset/create/spreadsheet/1aPutb-adaABiY4jlFuldib-aZRN8PAbl6vRQdZDkfgk
+###
+GET http://127.0.0.1:8080/v1/dataset/read/-MOfZXnNY0seECiaOfe_/0/100
+###
+PUT http://127.0.0.1:8080/v1/dataset/approve/-MOhH2q6Bp8S2FTbADpc
+Content-Type: application/json
+
+{
+  "name": "test_changed",
+  "header": [
+    {
+      "origin_index": 2,
+      "index": 0,
+      "title": "Cylinders-changed",
+      "decimals": 2
+    },
+    {
+      "origin_index": 4,
+      "index": 1,
+      "title": "Horsepower-changed",
+      "decimals": 2
+    }
+  ]
+}
