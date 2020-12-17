@@ -18,6 +18,6 @@ func New400(reason string, message string) *ServiceError {
 	return NewServiceError(400, reason, message)
 }
 
-func NewServiceError403(reason string, message string) *ServiceError {
+func New403(reason string, message string) *ServiceError {
 	return NewServiceError(403, reason, message)
 }

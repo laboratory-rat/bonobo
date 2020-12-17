@@ -6,9 +6,10 @@ import (
 )
 
 type IDatasetMetadataRepository interface {
-	GetList(filter *repomodel.SearchFilter) (*[]entity.DatasetMetadataEntity, error)
-	GetById(id string) (*entity.DatasetMetadataEntity, error)
 	Create(e *entity.DatasetMetadataEntity) (*entity.DatasetMetadataEntity, error)
+	GetList(filter *repomodel.SearchFilter) (*[]entity.DatasetMetadataEntity, error)
+	GetByID(id string) (*entity.DatasetMetadataEntity, error)
+	GetExpired() ([]*entity.DatasetMetadataEntity, error)
 	Update(e *entity.DatasetMetadataEntity) (*entity.DatasetMetadataEntity, error)
-	DeleteById(id string) error
+	DeleteByID(ID string) error
 }

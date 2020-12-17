@@ -5,7 +5,7 @@ import (
 	"bonobo.madrat.studio/ms/controller"
 	repoinstance "bonobo.madrat.studio/ms/infrastructure/repository/instance"
 	repointerface "bonobo.madrat.studio/ms/infrastructure/repository/interface"
-	"bonobo.madrat.studio/ms/service"
+	"bonobo.madrat.studio/ms/infrastructure/service"
 	"bonobo.madrat.studio/ms/utility"
 
 	"go.uber.org/dig"

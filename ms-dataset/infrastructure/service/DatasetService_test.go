@@ -3,7 +3,7 @@ package service_test
 import (
 	"testing"
 
-	"bonobo.madrat.studio/ms/service"
+	"bonobo.madrat.studio/ms/infrastructure/service"
 )
 
 const CREDENTIALS_PATH = "../secrets/credentials-gsa"

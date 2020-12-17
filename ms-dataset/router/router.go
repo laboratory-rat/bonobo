@@ -1,16 +1,19 @@
 package router
 
 import (
-	"net/http"
+	"time"
 
 	"bonobo.madrat.studio/ms/controller"
 	"bonobo.madrat.studio/ms/di"
 	"github.com/gin-gonic/gin"
+	gocron "github.com/go-co-op/gocron"
 )
 
+// Build - Prepare routes for app
 func Build() *gin.Engine {
-	container := di.BuildContainer()
 	r := gin.Default()
+	cron := gocron.NewScheduler(time.UTC)
+	container := di.BuildContainer()
 
 	v1 := r.Group("/v1")
 	{
@@ -19,8 +22,9 @@ func Build() *gin.Engine {
 			{
 				dataset.GET("/create/spreadsheet/:id", c.CreateFromSpreadsheet)
 				dataset.GET("/read/:id/:skip/:limit", c.Read)
-				dataset.PUT("/prepare/:id", c.Prepare)
-				dataset.DELETE("/delete/:id", c.Delete)
+				dataset.PUT("/approve/:id", c.Approve)
+				dataset.DELETE("/archive/:id", c.Archive)
+				cron.Every(1).Minute().Do(c.DeleteExpired)
 			}
 		})
 
@@ -29,9 +33,11 @@ func Build() *gin.Engine {
 		}
 	}
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": "hello world"})
-	})
+	cron.StartAsync()
+
+	// r.GET("/", func(c *gin.Context) {
+	// 	c.JSON(http.StatusOK, gin.H{"data": "hello world"})
+	// })
 
 	return r
 }

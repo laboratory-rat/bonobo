@@ -99,7 +99,12 @@ func (r *DatasetDataRepository) Read(id string) (*entity.DatasetDataEntity, erro
 }
 
 func (r *DatasetDataRepository) Update(entity *entity.DatasetDataEntity) (*entity.DatasetDataEntity, error) {
-	return nil, nil
+	err := r.Delete(entity.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Create(entity)
 }
 
 func (r *DatasetDataRepository) Delete(id string) error {
@@ -109,7 +114,7 @@ func (r *DatasetDataRepository) Delete(id string) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
 	defer cancel()
 
-	err := bucket.Object(id).Delete(ctx)
+	err := bucket.Object(getPath(id)).Delete(ctx)
 	if err != nil {
 		r.Logger.Panic(err)
 	}

@@ -2,7 +2,8 @@ package controller
 
 import (
 	"bonobo.madrat.studio/ms/domain/error"
-	"bonobo.madrat.studio/ms/service"
+	"bonobo.madrat.studio/ms/domain/model"
+	"bonobo.madrat.studio/ms/infrastructure/service"
 	"bonobo.madrat.studio/ms/utility"
 	"github.com/gin-gonic/gin"
 )
@@ -50,18 +51,32 @@ func (ct *DatasetController) Read(c *gin.Context) {
 	c.JSON(200, result)
 }
 
-func (ct *DatasetController) Prepare(c *gin.Context) {
+// Approve - Confirm dataset and allow it to use
+func (ct *DatasetController) Approve(c *gin.Context) {
+	var m model.DatasetApproveModel
 	id := c.Param("id")
-	_, err := ct.Service.ReadSpreadsheetAndSave(id)
+	c.BindJSON(&m)
+	err := ct.Service.Approve(id, m)
 	if err != nil {
 		c.AbortWithStatusJSON(err.Code, err)
 	}
+
+	c.Done()
 }
 
-func (ctr DatasetController) Delete(c *gin.Context) {
+// DeleteExpired - Not for external calls
+// Will remove all temporary/expired datasets
+func (ct *DatasetController) DeleteExpired() {
+
+}
+
+// Archive - Delete dataset and metadata
+func (ct *DatasetController) Archive(c *gin.Context) {
 	id := c.Param("id")
-	_, err := ctr.Service.ReadSpreadsheetAndSave(id)
+	err := ct.Service.Archive(id)
 	if err != nil {
 		c.AbortWithStatusJSON(err.Code, err)
 	}
+
+	c.Done()
 }

@@ -3,13 +3,16 @@ package service
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"bonobo.madrat.studio/ms/connector"
 	entity "bonobo.madrat.studio/ms/domain/entity/dataset"
 	"bonobo.madrat.studio/ms/domain/enum"
 	error "bonobo.madrat.studio/ms/domain/error"
+	model "bonobo.madrat.studio/ms/domain/model"
 	repointerface "bonobo.madrat.studio/ms/infrastructure/repository/interface"
 	"bonobo.madrat.studio/ms/utility"
 )
@@ -109,43 +112,40 @@ func (s *DatasetService) ReadSpreadsheetAndSave(spreadsheetID string) ([]*entity
 
 		// Create cells and headers
 		datasetHeaders := make([]entity.DatasetDataHeaderEntity, len(headers))
-		datasetCells := make([][]entity.IDatasetCellEntity, 0)
+		datasetCells := make([][][]interface{}, 0)
 		for colIndex, values := range colValues {
 			pValues, pType := processColumn(values)
 			colTypes = append(colTypes, pType)
 			for rowIndex, val := range pValues {
 				if len(datasetCells) <= rowIndex {
-					datasetCells = append(datasetCells, make([]entity.IDatasetCellEntity, len(headers)))
+					datasetCells = append(datasetCells, make([][]interface{}, len(headers)))
 				}
 
-				var datasetEntityToCreate entity.IDatasetCellEntity
+				var datasetEntityToCreate []interface{}
 				if pType == enum.DatasetColType_ColStringArray {
-					var toSave []string
+					var toSave []interface{}
 					for _, v := range val {
-						toSave = append(toSave, v.(string))
+						toSave = append(toSave, v)
 					}
 
-					datasetEntityToCreate = &entity.DatasetCellString{
-						Value: toSave,
-					}
+					datasetEntityToCreate = toSave
 				} else {
-					var toSave []float64
+					var toSave []interface{}
 					for _, v := range val {
-						toSave = append(toSave, v.(float64))
+						toSave = append(toSave, v)
 					}
 
-					datasetEntityToCreate = &entity.DatasetCellNumber{
-						Value: toSave,
-					}
+					datasetEntityToCreate = toSave
 				}
 
 				datasetCells[rowIndex][colIndex] = datasetEntityToCreate
 			}
 
 			datasetHeaders[colIndex] = entity.DatasetDataHeaderEntity{
-				ColType: pType,
-				Index:   colIndex,
-				Title:   headers[colIndex],
+				ColType:     pType,
+				Index:       colIndex,
+				OriginIndex: colIndex,
+				Title:       headers[colIndex],
 			}
 		}
 
@@ -179,7 +179,7 @@ func (s *DatasetService) ReadSpreadsheetAndSave(spreadsheetID string) ([]*entity
 
 	var metadatas []*entity.DatasetMetadataEntity
 	for _, dataset := range datasetsToSave {
-		metadata := entity.NewMetadataFromDataset(dataset, enum.DatasetSourceType_GoogleWorksheet)
+		metadata := entity.NewMetadataFromDataset(dataset, enum.DatasetSourceType_GoogleWorksheet, spreadsheetID)
 		if _, err := s.DatasetMetadataRepository.Create(metadata); err != nil {
 			s.Logger.Fatal(err)
 		} else {
@@ -192,20 +192,135 @@ func (s *DatasetService) ReadSpreadsheetAndSave(spreadsheetID string) ([]*entity
 
 // Read - Read dataset
 func (s *DatasetService) Read(metadataID string, skip int, limit int) (*entity.DatasetDataEntity, *error.ServiceError) {
-	metadata, err := s.DatasetMetadataRepository.GetById(metadataID)
+	_, dataset, err := s.getMetadataAndDataset(metadataID)
 	if err != nil {
-		return nil, error.New400("Metadata not found", "not-found")
-	}
-
-	dataset, err := s.DatasetDataRepository.Read(metadata.SourceReference)
-	if err != nil {
-		return nil, error.New400("Dataset not found", "not-found")
+		return nil, err
 	}
 
 	skip = int(math.Min(float64(skip), float64(len(dataset.Body))))
 	limit = int(math.Min(float64(limit), float64(len(dataset.Body))))
 	dataset.Body = dataset.Body[skip:limit]
 	return dataset, nil
+}
+
+// Approve - Remove is templorary marker from dataset and delete extra columns
+func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel) *error.ServiceError {
+	if len(m.Header) == 0 {
+		return error.New400("No entities selected", "bad-model")
+	}
+
+	metadata, dataset, err := s.getMetadataAndDataset(metadataID)
+	if err != nil {
+		return err
+	}
+
+	dataset.Name = m.Name
+
+	sort.SliceStable(m.Header, func(i, j int) bool {
+		return m.Header[i].Index < m.Header[j].Index
+	})
+
+	updatedHeader := make([]entity.DatasetDataHeaderEntity, len(m.Header))
+
+	for _, entityHeader := range dataset.Header {
+		var matchHeader *model.DatasetApproveModelHeader
+		for _, mh := range m.Header {
+			if mh.OriginIndex == entityHeader.Index {
+				matchHeader = &mh
+				break
+			}
+		}
+
+		if matchHeader == nil {
+			continue
+		}
+
+		updatedHeader[matchHeader.Index] = entity.DatasetDataHeaderEntity{
+			ColType:     entityHeader.ColType,
+			Decimals:    matchHeader.Decimals,
+			Index:       matchHeader.Index,
+			OriginIndex: entityHeader.OriginIndex,
+			Title:       matchHeader.Title,
+		}
+	}
+
+	// oldYSize, newYSize := len(dataset.Header), len(updatedHeader)
+	dataset.Header = updatedHeader
+	updatedBody := make([][][]interface{}, len(dataset.Body))
+	for rowIndex, row := range dataset.Body {
+		updatedRow := make([][]interface{}, len(updatedHeader))
+		for _, uh := range updatedHeader {
+			updatedRow[uh.Index] = row[uh.OriginIndex]
+		}
+
+		updatedBody[rowIndex] = updatedRow
+	}
+
+	dataset.Body = updatedBody
+	updatedMetadata := entity.NewMetadataFromDataset(dataset, metadata.SourceType, metadata.SourceReference)
+	updatedMetadata.ID = metadata.ID
+	dataset.MetadataID = updatedMetadata.ID
+	updatedMetadata.CreatedTime = metadata.CreatedTime
+	updatedMetadata.UpdatedTime = metadata.UpdatedTime
+	updatedMetadata.LastSyncTime = metadata.LastSyncTime
+	updatedMetadata.IsTemporary = false
+
+	dataset, er := s.DatasetDataRepository.Update(dataset)
+	if er != nil {
+		s.Logger.Fatal(er)
+		return error.New400("Can not save dataset", "dataset-write")
+	}
+
+	updatedMetadata, er = s.DatasetMetadataRepository.Update(updatedMetadata)
+	if er != nil {
+		s.Logger.Fatal(er)
+		return error.New400("Can not save dataset metadata", "metadata-write")
+	}
+
+	return nil
+}
+
+// DeleteExpired - Delete all temporary and expired datasets with metadatas
+func (s *DatasetService) DeleteExpired() {
+	metadatas, err := s.DatasetMetadataRepository.GetExpired()
+	if err != nil {
+		s.Logger.Panic(err)
+		return
+	}
+
+	if len(metadatas) == 0 {
+		return
+	}
+
+	for _, m := range metadatas {
+		err = s.DatasetMetadataRepository.DeleteByID(m.ID)
+		if err != nil {
+			s.Logger.Fatal("Can not delete expired metadata: %s", m.ID)
+			continue
+		}
+
+		err = s.DatasetDataRepository.Delete(m.DatasetReference)
+		if err != nil {
+			s.Logger.Fatal("Can not delete expired dataset: %s", m.DatasetReference)
+		}
+	}
+}
+
+// Archive - Archive metadata
+func (s *DatasetService) Archive(ID string) *error.ServiceError {
+	metadata, err := s.DatasetMetadataRepository.GetByID(ID)
+	if err != nil {
+		return error.New400("Can not archive metadata", "metadata-archive-error")
+	}
+
+	metadata.IsArchived = true
+	metadata.ArchivedTime = time.Now().Unix()
+	metadata, err = s.DatasetMetadataRepository.Update(metadata)
+	if err != nil {
+		return error.New400("Can not archive metadata", "metadata-archive-error")
+	}
+
+	return nil
 }
 
 func processColumn(data []string) ([][]interface{}, enum.DatasetColType) {
@@ -281,4 +396,18 @@ func processColumn(data []string) ([][]interface{}, enum.DatasetColType) {
 	}
 
 	return result, colType
+}
+
+func (s *DatasetService) getMetadataAndDataset(metadataID string) (*entity.DatasetMetadataEntity, *entity.DatasetDataEntity, *error.ServiceError) {
+	metadata, err := s.DatasetMetadataRepository.GetByID(metadataID)
+	if err != nil {
+		return nil, nil, error.New400("Metadata not found", "not-found")
+	}
+
+	dataset, err := s.DatasetDataRepository.Read(metadata.DatasetReference)
+	if err != nil {
+		return nil, nil, error.New400("Dataset not found", "not-found")
+	}
+
+	return metadata, dataset, nil
 }

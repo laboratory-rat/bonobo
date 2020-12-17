@@ -6,9 +6,11 @@ require (
 	cloud.google.com/go v0.74.0 // indirect
 	cloud.google.com/go/firestore v1.1.1
 	cloud.google.com/go/logging v1.1.2
+	cloud.google.com/go/storage v1.10.0
 	firebase.google.com/go v3.13.0+incompatible // indirect
 	firebase.google.com/go/v4 v4.1.0
 	github.com/gin-gonic/gin v1.6.3
+	github.com/go-co-op/gocron v0.4.0
 	github.com/jinzhu/gorm v1.9.16 // indirect
 	github.com/kjk/betterguid v0.0.0-20170621091430-c442874ba63a
 	go.uber.org/dig v1.10.0

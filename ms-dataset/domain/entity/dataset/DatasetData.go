@@ -9,21 +9,22 @@ type DatasetDataEntity struct {
 	MetadataID  string                    `json:"metadata_id"`
 	UserID      string                    `json:"user_id"`
 	Header      []DatasetDataHeaderEntity `json:"header"`
-	Body        [][]IDatasetCellEntity    `json:"body"`
+	Body        [][][]interface{}         `json:"body"`
 	CreatedTime int64                     `json:"created_time"`
 	UpdatedTime int64                     `json:"updated_time"`
 }
 
 // DatasetDataHeaderEntity - Explain data cols types and names
 type DatasetDataHeaderEntity struct {
-	Index    int
-	Title    string
-	ColType  enum.DatasetColType
-	Decimals int8
+	OriginIndex int                 `json:"origin_index"`
+	Index       int                 `json:"index"`
+	Title       string              `json:"title"`
+	ColType     enum.DatasetColType `json:"col_type"`
+	Decimals    int8                `json:"decimals"`
 }
 
 // NewDatasetDataEntity - Create new data entity
-func NewDatasetDataEntity(userID string, name string, header []DatasetDataHeaderEntity, body [][]IDatasetCellEntity) *DatasetDataEntity {
+func NewDatasetDataEntity(userID string, name string, header []DatasetDataHeaderEntity, body [][][]interface{}) *DatasetDataEntity {
 	return &DatasetDataEntity{
 		Name:       name,
 		MetadataID: "NULL",
