@@ -13,18 +13,13 @@ import (
 	"os"
 )
 
+// Container - All application dependencies
 var Container *dig.Container
 
-// Init and prepare all instances
+// BuildContainer - Init and prepare all instances
 func BuildContainer() *dig.Container {
 	vFirebaseConfig := os.Getenv("BNB-FIREBASE-CONFIG")
 	vFirebase := os.Getenv("BNB-FIREBASE-CREDENTIALS")
-	vGsa := os.Getenv("BNB-GOOGLE-SERVICE-ACCOUNT")
-
-	v := os.Getenv("FIRESTORE_EMULATOR_HOST")
-	if v == "123123" {
-		panic("Som")
-	}
 
 	Container = dig.New()
 
@@ -48,7 +43,7 @@ func BuildContainer() *dig.Container {
 
 	// App google spreadsheet connector
 	err = Container.Provide(func() (*connector.GoogleSpreadsheetsConnector, error) {
-		connector, err := connector.NewGoogleSpreadsheetConnectorFromJSON(vGsa)
+		connector, err := connector.NewGoogleSpreadsheetConnectorFromJSON(vFirebase)
 		return connector, err
 	})
 	if err != nil {
