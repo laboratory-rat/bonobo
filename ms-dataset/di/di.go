@@ -18,14 +18,17 @@ var Container *dig.Container
 
 // BuildContainer - Init and prepare all instances
 func BuildContainer() *dig.Container {
-	vFirebaseConfig := os.Getenv("BNB-FIREBASE-CONFIG")
-	vFirebase := os.Getenv("BNB-FIREBASE-CREDENTIALS")
+	vName := os.Getenv("BNB_NAME")
+	vProjectID := os.Getenv("BNB_PROJECT_ID")
+	vDatabaseURL := os.Getenv("BNB_DATABASE_URL")
+	vStorageURL := os.Getenv("BNB_STORAGE_URL")
+	vFirebase := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 	Container = dig.New()
 
 	// Logger
 	err := Container.Provide(func() *utility.Logger {
-		logger, _ := utility.NewLogger("mr-bonobo", "mr-bonobo-dev")
+		logger, _ := utility.NewLogger(vProjectID, vName)
 		return logger
 	})
 	if err != nil {
@@ -34,7 +37,7 @@ func BuildContainer() *dig.Container {
 
 	// App firebase connector
 	err = Container.Provide(func() (*connector.AppFirebase, error) {
-		connector, err := connector.NewFirebaseConnectorFromJSON(vFirebase, vFirebaseConfig)
+		connector, err := connector.NewFirebaseConnectorFromJSON(vFirebase, vProjectID, vDatabaseURL, vStorageURL)
 		return connector, err
 	})
 	if err != nil {

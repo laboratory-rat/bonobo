@@ -8,7 +8,6 @@ services:
       - BNB-PROJECT-ID=mr-bonobo
       - BNB-NAME=mr-bonobo-dev
       - BNB-FIREBASE-CONFIG=./secret/config-firebase.json
-      - BNB-FIREBASE-CREDENTIALS=./secret/credentials-firebase.json
       - GOOGLE_APPLICATION_CREDENTIALS=./secret/credentials-firebase.json
     ports:
       - '8080:8080'

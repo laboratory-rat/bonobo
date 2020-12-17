@@ -2,9 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -54,23 +51,11 @@ func NewFirebaseConnectorFromOptions(options option.ClientOption, config *fireba
 }
 
 // NewFirebaseConnectorFromJSON - Create new connector from json file
-func NewFirebaseConnectorFromJSON(credentialsPath string, configPath string) (*AppFirebase, error) {
-	configFile, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	defer configFile.Close()
-
-	configContent, err := ioutil.ReadAll(configFile)
-	if err != nil {
-		return nil, err
-	}
-
-	var config firebase.Config
-	err = json.Unmarshal(configContent, &config)
-	if err != nil {
-		return nil, err
+func NewFirebaseConnectorFromJSON(credentialsPath string, projectID string, databaseURL string, storageURL string) (*AppFirebase, error) {
+	config := firebase.Config{
+		ProjectID:     projectID,
+		DatabaseURL:   databaseURL,
+		StorageBucket: storageURL,
 	}
 
 	opt := option.WithCredentialsFile(credentialsPath)
