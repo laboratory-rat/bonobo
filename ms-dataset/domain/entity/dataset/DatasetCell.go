@@ -13,7 +13,7 @@ type IDatasetCellEntity interface {
 	Length() int
 }
 
-// DatasetCellNumber - Cell for numberic content
+// DatasetCellNumber - Cell for numeric content
 type DatasetCellNumber struct {
 	Value []float64 `json:"value"`
 }
@@ -24,9 +24,9 @@ type DatasetCellString struct {
 }
 
 func (cell DatasetCellNumber) ReadNumbers(roundDecimals *int8) []float64 {
-	result := []float64{}
-	for i, r := range cell.Value {
-		result[i] = utility.RoundNumber(r, roundDecimals)
+	var result []float64
+	for _, r := range cell.Value {
+		result = append(result, utility.RoundNumber(r, roundDecimals))
 	}
 
 	return result

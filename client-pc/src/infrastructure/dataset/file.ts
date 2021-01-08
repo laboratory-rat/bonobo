@@ -12,7 +12,7 @@ import * as F from 'fp-ts/function';
 import * as E from 'fp-ts/Either';
 import { AppDataset } from '.';
 import { AppError, createAppError } from '../core';
-import { AppDatasetMetadata, createAppDatasetMetadata } from './AppDatasetMetadata';
+import { AppDatasetMetadata } from './AppDatasetMetadata';
 import * as yaml from 'js-yaml';
 
 /**
@@ -47,33 +47,32 @@ const validateDatasetsFolder = () => {
  * @param {!Partial<AppDatasetMetadata>} [metadata] - Exists metadata (for resave already exists)
  * @return {Either<AppError, unknown>}
  */
-export const writeDataset = (dataset: AppDataset, metadata?: Partial<AppDatasetMetadata>): E.Either<AppError, unknown> => {
-  validateDatasetsFolder();
-  return F.pipe(
-    dataset,
-    E.fromNullable(createAppError({ message: 'No dataset to save' })),
-    E.chain(createAppDatasetMetadata),
-    E.map(meta => {
-      meta = {
-        ...meta,
-        ...metadata
-      };
-
-      const datasetFolderPath = fullDatasetPath(meta.id);
-      if (datasetFolderPath) {
-        fs.rmdirSync(datasetFolderPath, {
-          recursive: true
-        });
-      }
-
-      fs.mkdirSync(datasetFolderPath);
-      const metadataPath = path.join(datasetFolderPath, METADATA_FILENAME);
-      const datasetPath = path.join(datasetFolderPath, DATASET_FILENAME);
-      fs.writeFileSync(metadataPath, yaml.safeDump(meta), { encoding: 'utf-8' });
-      fs.writeFileSync(datasetPath, JSON.stringify(dataset), { encoding: 'utf-8' });
-    })
-  );
-};
+// export const writeDataset = (dataset: AppDataset, metadata?: Partial<AppDatasetMetadata>): E.Either<AppError, unknown> => {
+//   validateDatasetsFolder();
+//   return F.pipe(
+//     dataset,
+//     E.fromNullable(createAppError({ message: 'No dataset to save' })),
+//     E.chain(createAppDatasetMetadata),
+//     E.map(meta => {
+//       meta = {
+//         ...metadata
+//       };
+//
+//       const datasetFolderPath = fullDatasetPath("");
+//       if (datasetFolderPath) {
+//         fs.rmdirSync(datasetFolderPath, {
+//           recursive: true
+//         });
+//       }
+//
+//       fs.mkdirSync(datasetFolderPath);
+//       const metadataPath = path.join(datasetFolderPath, METADATA_FILENAME);
+//       const datasetPath = path.join(datasetFolderPath, DATASET_FILENAME);
+//       fs.writeFileSync(metadataPath, yaml.safeDump(meta), { encoding: 'utf-8' });
+//       fs.writeFileSync(datasetPath, JSON.stringify(dataset), { encoding: 'utf-8' });
+//     })
+//   );
+// };
 
 /**
  * Scan datasets folder and return list of exists metadatas

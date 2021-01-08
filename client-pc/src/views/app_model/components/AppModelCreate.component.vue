@@ -48,24 +48,6 @@
           label="Training split *"
         />
       </div>
-      <!-- <div class="col-6"> // Error threshold is impossible (or I can not find it now)
-        <q-input
-          type="number"
-          filled
-          dense
-          v-model="model.errorThreshold"
-          label="Error threshold"
-        >
-          <template v-slot:append>
-            <q-icon
-              v-if="!!model.errorThreshold"
-              class="cursor-pointer"
-              name="close"
-              @click="model.errorThreshold = null"
-            />
-          </template>
-        </q-input>
-      </div> -->
       <div class="col-6">
         <q-input
           type="number"

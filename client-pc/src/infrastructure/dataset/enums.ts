@@ -7,101 +7,107 @@
 
 import { KeyLabelStringIterable } from '../core';
 
-export enum EnumAppDatasetProcessType {
+/**
+ * What source used to create this dataset
+ */
+export enum EnumAppDatasetMetadataSourceType {
+  GOOGLE_WORKSHEET = 'GOOGLE_WORKSHEET',
+  UPLOADED_FILE = 'UPLOADED_FILE'
+}
+
+/**
+ * Transform value to string representation
+ * @param value
+ */
+export const enumAppDatasetMetadataSourceTypeToString = (value: EnumAppDatasetMetadataSourceType): string => {
+  switch (value) {
+    case EnumAppDatasetMetadataSourceType.GOOGLE_WORKSHEET:
+      return 'Google worksheet';
+    case EnumAppDatasetMetadataSourceType.UPLOADED_FILE:
+      return 'Uploaded file';
+    default:
+      return String(value);
+  }
+};
+
+/**
+ * Dataset cell content
+ */
+export enum EnumAppDatasetMetadataColType {
+  NUMBER_ARRAY = 'NUMBER_ARRAY',
+  STRING_ARRAY = 'STRING_ARRAY'
+}
+
+/**
+ * Transform value to string representation
+ * @param value
+ */
+export const enumAppDatasetMetadataColTypeToString = (value: EnumAppDatasetMetadataColType): string => {
+  switch (value) {
+    case EnumAppDatasetMetadataColType.NUMBER_ARRAY:
+      return 'Number array';
+    case EnumAppDatasetMetadataColType.STRING_ARRAY:
+      return 'String array';
+    default:
+      return String(value);
+  }
+};
+
+/**
+ * Selectable list for dataset process types
+ */
+export const enumAppDatasetColTypeList = (): KeyLabelStringIterable<EnumAppDatasetMetadataColType>[] => [
+  {
+    key: EnumAppDatasetMetadataColType.STRING_ARRAY,
+    label: enumAppDatasetMetadataColTypeToString(EnumAppDatasetMetadataColType.STRING_ARRAY)
+  },
+  {
+    key: EnumAppDatasetMetadataColType.NUMBER_ARRAY,
+    label: enumAppDatasetMetadataColTypeToString(EnumAppDatasetMetadataColType.NUMBER_ARRAY)
+  },
+];
+
+/**
+ * In what operations dataset will be used
+ */
+export enum EnumAppDatasetMetadataProcessType {
   training = 'TRAINING',
   validation = 'VALIDATION',
   prediction = 'PREDICTION'
 }
 
-export const enumAppDatasetTypeToString = (value: EnumAppDatasetProcessType) => {
+/**
+ * Transform value to string representation
+ * @param value
+ */
+export const enumAppDatasetTypeToString = (value: EnumAppDatasetMetadataProcessType): string => {
   switch (value) {
-    case EnumAppDatasetProcessType.training:
+    case EnumAppDatasetMetadataProcessType.training:
       return 'Training';
-    case EnumAppDatasetProcessType.prediction:
+    case EnumAppDatasetMetadataProcessType.prediction:
       return 'Prediction';
-    case EnumAppDatasetProcessType.validation:
+    case EnumAppDatasetMetadataProcessType.validation:
       return 'Validation';
     default:
-      throw 'Wrong app dataset type';
+      return String(value);
   }
 };
 
-export const enumAppDatasetTypeList = (): KeyLabelStringIterable<EnumAppDatasetProcessType>[] => [
+/**
+ * Selectable list for dataset process types
+ */
+export const enumAppDatasetTypeList = (): KeyLabelStringIterable<EnumAppDatasetMetadataProcessType>[] => [
   {
-    key: EnumAppDatasetProcessType.prediction,
-    label: enumAppDatasetTypeToString(EnumAppDatasetProcessType.prediction)
+    key: EnumAppDatasetMetadataProcessType.prediction,
+    label: enumAppDatasetTypeToString(EnumAppDatasetMetadataProcessType.prediction)
   },
   {
-    key: EnumAppDatasetProcessType.training,
-    label: enumAppDatasetTypeToString(EnumAppDatasetProcessType.training)
+    key: EnumAppDatasetMetadataProcessType.training,
+    label: enumAppDatasetTypeToString(EnumAppDatasetMetadataProcessType.training)
   },
   {
-    key: EnumAppDatasetProcessType.validation,
-    label: enumAppDatasetTypeToString(EnumAppDatasetProcessType.validation)
+    key: EnumAppDatasetMetadataProcessType.validation,
+    label: enumAppDatasetTypeToString(EnumAppDatasetMetadataProcessType.validation)
   },
 ];
-
-
-export enum EnumAppDatasetSource {
-  googleSpreadsheet = 'GOOGLE_SPREADSHEET',
-  csv = 'CSV',
-  xls = 'XLS'
-}
-
-export enum EnumAppDatasetColType {
-  category = 'CATEGORY',
-  number = 'NUMBER',
-  sequenceCategory = 'SEQUENCE_CATEGORY',
-  sequenceNumber = 'SEQUENCE_NUMBER',
-}
-
-export const enumAppDatasetColTypeToString = (value: EnumAppDatasetColType) => {
-  switch (value) {
-    case EnumAppDatasetColType.category:
-      return 'Category';
-    case EnumAppDatasetColType.number:
-      return 'Number';
-    case EnumAppDatasetColType.sequenceCategory:
-      return 'Sequence Category';
-    case EnumAppDatasetColType.sequenceNumber:
-      return 'Sequence Number';
-    default:
-      throw 'Wrong app dataset col type';
-  }
-};
-
-export const enumAppDatasetColTypeList = (): KeyLabelStringIterable<EnumAppDatasetColType>[] => [
-  {
-    key: EnumAppDatasetColType.number,
-    label: enumAppDatasetColTypeToString(EnumAppDatasetColType.number)
-  },
-  {
-    key: EnumAppDatasetColType.category,
-    label: enumAppDatasetColTypeToString(EnumAppDatasetColType.category)
-  },
-  {
-    key: EnumAppDatasetColType.sequenceCategory,
-    label: enumAppDatasetColTypeToString(EnumAppDatasetColType.sequenceCategory)
-  },
-  {
-    key: EnumAppDatasetColType.sequenceNumber,
-    label: enumAppDatasetColTypeToString(EnumAppDatasetColType.sequenceNumber)
-  },
-];
-
-export enum EnumAppDatasetDataType {
-  table = 'TABLE',
-  images = 'IMAGES'
-}
-
-export const enumAppDatasetDataTypeToString = (value: EnumAppDatasetDataType) => {
-  switch (value) {
-    case EnumAppDatasetDataType.table:
-      return 'Table';
-    case EnumAppDatasetDataType.images:
-      return 'Images';
-    default:
-      return 'Unknown';
-  }
-};
 

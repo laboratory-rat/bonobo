@@ -3,6 +3,7 @@
 **/.dataset/
 **/.model/
 **/.vscode/
+**/.idea/
 **/secret/
 **/dist_electron/
 **/docker-compose.yml

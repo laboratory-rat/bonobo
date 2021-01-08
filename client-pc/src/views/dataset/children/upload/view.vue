@@ -3,14 +3,16 @@
     <q-page padding>
       <div class="row justify-center">
         <div class="col-10">
-          <q-card>
+          <q-card v-if="model">
             <q-card-section>
               <q-input
                 clearable
+                dense
                 :disable="isLoading"
                 clear-icon="close"
                 outlined
                 v-model="model.id"
+                debounce="50"
                 label="Sheet id"
               >
                 <template v-slot:after>
@@ -21,46 +23,32 @@
                     :disable="!model.id || !model.id.length || isLoading"
                     icon="cloud_download"
                     :loading="isLoading"
-                    @click="uploadSheet"
+                    @click="upload"
                   />
                 </template>
               </q-input>
             </q-card-section>
           </q-card>
-          <div class="q-mt-md" v-if="uploaded">
+          <div class="q-mt-md" v-if="processed && processed.length">
             <q-card>
-              <source-uploaded-display-component
-                :data="uploaded"
-                @update="onUploadedWorksheetSelectedChanged"
+              <scheme-selector-component
+                :metadata-list="processed"
+                :selected-metadata-list="selectedMetadataList"
+                @selected:update="toggleScheme"
               />
             </q-card>
-            <div v-if="schemeWorksheetsAsList.length">
-              <q-separator class="q-my-md" />
-              <div
-                v-for="schemeWorksheet of schemeWorksheetsAsList"
-                :key="schemeWorksheet[0]"
-              >
-                <source-uploaded-worksheet-display-component
-                  :data="schemeWorksheet[1]"
-                  :worksheetIndex="schemeWorksheet[0]"
-                  @update="col => onSchemeColUpdate(schemeWorksheet[0], col)"
-                  @update-worksheet="
-                    scheme =>
-                      onWorksheetMetadataUpdate(schemeWorksheet[0], scheme)
-                  "
+          </div>
+          <div v-if='selectedMetadataList && selectedMetadataList.length'>
+            <q-card class='q-mt-md' v-for='id in selectedMetadataList' :key='id'>
+              <scheme-update-component
+                :approve-model='selectedMetadataMap.get(id)'
+                :examples='[]'
+                :data='getMetadataByID(id)'
+                :saved='approvedMetadataList.indexOf(id) !== -1'
+                @model:update='(m) => updateScheme({worksheetID: id, model: m})'
+                @model:approve='approveScheme'
                 />
-              </div>
-              <q-separator class="q-my-md" />
-              <div class="q-mb-md row justify-end">
-                <q-btn
-                  color="primary"
-                  text-color="white"
-                  :disable="!isWorksheetsReady"
-                  @click="onSave"
-                  >Create datasets</q-btn
-                >
-              </div>
-            </div>
+            </q-card>
           </div>
         </div>
       </div>
@@ -71,138 +59,85 @@
 <script lang="ts">
 import Vue from 'vue';
 import Component from 'vue-class-component';
-import { Getter, Action } from 'vuex-class';
+import { namespace } from 'vuex-class';
 import {
   EnumStoreDatasetUploadGetters as getters,
   EnumStoreDatasetUploadActions as actions,
   StoreDatasetUploadModel,
-  onSaveActionResponse
+  AppDatasetApproveSelected
 } from './store';
-import * as IM from '@/infrastructure/core/IndexedMap';
 import { Watch } from 'vue-property-decorator';
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-import SourceUploadedDisplayComponent from './components/SourceUploadedDisplay.component.vue';
-import SourceUploadedWorksheetDisplayComponent from './components/SourceUploadedWorksheetDisplay.component.vue';
-import {
-  SourceGoogleScheetColScheme,
-  SourceGoogleSheetScheme,
-  SourceGoogleSheetWorksheetScheme
-} from '@/infrastructure/source/google';
-import { sourceGoogleSheetWorksheetSchemeValidator } from '@/infrastructure/source/google/validators';
+import { AppDatasetApprove, AppDatasetMetadata } from '@/infrastructure/dataset';
+import SchemeUpdateComponent from '@/views/dataset/children/upload/components/SchemeUpdate.component.vue';
+import SchemeSelectorComponent from '@/views/dataset/children/upload/components/SchemeSelector.component.vue';
 
-const STATE_PATH = 'dataset/upload';
+const store = namespace('dataset/upload');
 
 @Component({
   components: {
-    SourceUploadedDisplayComponent,
-    SourceUploadedWorksheetDisplayComponent
+    SchemeUpdateComponent,
+    SchemeSelectorComponent
   }
 })
 export default class DatasetUploadView extends Vue {
-  @Getter(`${STATE_PATH}/${getters.model}`)
+  @store.Getter(getters.model)
   _model!: StoreDatasetUploadModel;
 
-  @Getter(`${STATE_PATH}/${getters.scheme}`)
-  scheme!: SourceGoogleSheetScheme;
-
-  @Getter(`${STATE_PATH}/${getters.uploaded}`)
-  uploaded!: GoogleSpreadsheet | null;
-
-  @Getter(`${STATE_PATH}/${getters.selectedWorksheetsIndexes}`)
-  _selectedWorksheetIndexes!: number[];
-
-  @Getter(`${STATE_PATH}/${getters.isLoading}`)
+  @store.Getter(getters.isLoading)
   isLoading!: boolean;
 
-  @Action(`${STATE_PATH}/${actions.updateModel}`)
-  _updateModel!: (model: StoreDatasetUploadModel) => void;
+  @store.Getter(getters.processed)
+  processed!: AppDatasetMetadata[];
 
-  @Action(`${STATE_PATH}/${actions.upload}`)
-  _upload!: () => Promise<void>;
+  @store.Getter(getters.approvedMetadataList)
+  approvedMetadataList!: string[];
 
-  @Action(`${STATE_PATH}/${actions.updateColumn}`)
-  _actionUpdateColumn!: (payload: {
-    worksheetIndex: number;
-    col: SourceGoogleScheetColScheme;
-  }) => void;
+  @store.Getter(getters.selectedMetadataList)
+  selectedMetadataList!: string[];
 
-  @Action(`${STATE_PATH}/${actions.updateWorksheetMetadata}`)
-  _actionUpdateWorksheetMetadata!: (payload: {
-    scheme: Partial<SourceGoogleSheetWorksheetScheme>;
-    worksheetIndex: number;
-  }) => void;
+  @store.Getter(getters.selectedMetadataMap)
+  selectedMetadataMap!: Map<string, AppDatasetApproveSelected>;
 
-  @Action(`${STATE_PATH}/${actions.reset}`)
-  _reset!: () => void;
-
-  @Action(`${STATE_PATH}/${actions.updateSelectedWorksheets}`)
-  _updateSelectedWorksheets!: (payload: {
-    selectedWorksheetsIndexes: number[];
-  }) => void;
-
-  @Action(`${STATE_PATH}/${actions.save}`)
-  _save!: () => onSaveActionResponse;
-
-  get schemeWorksheetsAsList(): (
-    | number
-    | SourceGoogleSheetWorksheetScheme
-  )[][] {
-    if (!this.scheme) return [];
-    return IM.getEntities(this.scheme.sheets).map(x => [x.key, x.value]);
-  }
-
-  get isWorksheetsReady(): boolean {
-    return !IM.getValues(this.scheme.sheets)
-      .map(sourceGoogleSheetWorksheetSchemeValidator)
-      .some(x => x._tag == 'Left');
-  }
-
-  model: StoreDatasetUploadModel = { id: '' };
+  model: StoreDatasetUploadModel | null = null;
 
   @Watch('_model')
-  _watchModel(state: StoreDatasetUploadModel) {
-    this.model = { ...state };
+  watchOnModel(m: StoreDatasetUploadModel) {
+    this.model = {
+      ...m
+    };
+  }
+
+  @store.Action(actions.updateModel)
+  _updateModel!: any;
+
+  @store.Action(actions.upload)
+  upload!: any;
+
+  @store.Action(actions.toggleScheme)
+  toggleScheme!: (id: string) => unknown;
+
+  @store.Action(actions.updateScheme)
+  updateScheme!: (payload: { worksheetID: string; model: AppDatasetApprove }) => unknown;
+
+  @store.Action(actions.approveScheme)
+  approveScheme!: (modelID: string) => unknown;
+
+  updateModel() {
+    this._updateModel(this.model);
+  }
+
+  getMetadataByID(id: string): AppDatasetMetadata | undefined {
+    return this.processed.find(x => x.id == id);
+  }
+
+  getExamplesByID(id: string): unknown {
+    return null;
   }
 
   mounted() {
-    this._reset();
-  }
-
-  onUploadedWorksheetSelectedChanged(selectedIndexes: number[]) {
-    this._updateSelectedWorksheets({
-      selectedWorksheetsIndexes: selectedIndexes
-    });
-  }
-
-  onSchemeColUpdate(worksheetIndex: number, col: SourceGoogleScheetColScheme) {
-    this._actionUpdateColumn({
-      worksheetIndex: worksheetIndex,
-      col: col
-    });
-  }
-
-  onWorksheetMetadataUpdate(
-    worksheetIndex: number,
-    scheme: Partial<SourceGoogleSheetWorksheetScheme>
-  ) {
-    this._actionUpdateWorksheetMetadata({
-      worksheetIndex: worksheetIndex,
-      scheme: scheme
-    });
-  }
-
-  onSave() {
-    this._save();
-    this.$router.push({ name: 'dataset' });
-  }
-
-  uploadSheet() {
-    if (!this.model || !this.model.id || !this.model.id.length) {
-      return;
-    }
-
-    this._updateModel(this.model);
-    this._upload();
+    this.model = {
+      ...this._model
+    };
   }
 }
 </script>

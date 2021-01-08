@@ -46,7 +46,7 @@
 </template>
 
 <script lang="ts">
-import { EnumAppDatasetProcessType } from '@/infrastructure/dataset';
+import { EnumAppDatasetMetadataProcessType } from '@/infrastructure/dataset';
 import { QDialog } from 'quasar';
 import { Component, Prop } from 'vue-property-decorator';
 import {
@@ -99,7 +99,7 @@ export default class CreatePredictionDialog extends QDialog {
     this.model = {
       datasetId: $event.metadata.id,
       datasetName: $event.metadata.name,
-      isValidation: $event.type == EnumAppDatasetProcessType.validation
+      isValidation: $event.type == EnumAppDatasetMetadataProcessType.validation
     };
   }
 

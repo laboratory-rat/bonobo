@@ -9,7 +9,7 @@
               <div class="flex justify-between">
                 <div>
                   <div class="text-subtitle2">{{ meta.name }}</div>
-                  <div class="text-caption">{{ meta.type }}</div>
+                  <div class="text-caption">{{ meta.datasetProcessType }}</div>
                 </div>
                 <div class="text-subtitle2 text-grey">
                   {{ meta.updatedTime | appTime }}
@@ -17,12 +17,10 @@
               </div>
               <div class="q-mt-sm">
                 <div>
-                  Cols count: {{ meta.colsCount }} ({{
-                    meta.colsInputsCount
-                  }}
-                  in + {{ meta.colsCount - meta.colsInputsCount }} out)
+                  Cols: {{meta.header.filter(x => !x.isOutput).length}} + {{meta.header.filter(x => x.isOutput).length}}
                 </div>
-                <div>Source: {{ meta.source }}</div>
+                <div>Size: {{meta.size}}</div>
+                <div>Source: {{ meta.sourceType }}</div>
               </div>
             </q-card-section>
             <q-menu touch-position>
@@ -102,6 +100,10 @@ export default class DatasetListView extends Vue {
         F.pipe(
           model,
           E.fromNullable(createAppError({ message: 'App model is null' })),
+          e => {
+            console.log(e);
+            return e;
+          },
           E.chain(AM.writeAppModel),
           E.fold(NS.toastError, () => {
             this.$router.push({

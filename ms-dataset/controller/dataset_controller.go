@@ -28,6 +28,23 @@ func (ct *DatasetController) CreateFromSpreadsheet(c *gin.Context) {
 	c.JSON(200, result)
 }
 
+// List - Get stored metadata by query
+func (ct *DatasetController) List(c *gin.Context) {
+	startAfter := c.Query("start_after")
+	limitParam := c.Param("limit")
+	limit, err := utility.IntFromString(limitParam)
+	if err != nil {
+		c.AbortWithStatusJSON(400, error.New400("Bad skip param", "bad-param"))
+	}
+
+	result, er := ct.Service.List(startAfter, limit)
+	if er != nil {
+		c.AbortWithStatusJSON(er.Code, er)
+	}
+
+	c.JSON(200, result)
+}
+
 func (ct *DatasetController) Read(c *gin.Context) {
 	id := c.Param("id")
 	skipParam := c.Param("skip")

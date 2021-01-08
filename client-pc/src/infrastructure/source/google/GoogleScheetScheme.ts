@@ -1,4 +1,4 @@
-import { EnumAppDatasetColType, EnumAppDatasetProcessType } from '@/infrastructure/dataset';
+import { EnumAppDatasetColType, EnumAppDatasetMetadataProcessType } from '@/infrastructure/dataset';
 import * as IM from '@/infrastructure/core/IndexedMap';
 
 export interface SourceGoogleSheetScheme {
@@ -7,7 +7,7 @@ export interface SourceGoogleSheetScheme {
 
 export interface SourceGoogleSheetWorksheetScheme {
   cols: IM.IndexedMap<SourceGoogleScheetColScheme>;
-  type: EnumAppDatasetProcessType;
+  type: EnumAppDatasetMetadataProcessType;
   name: string;
 }
 

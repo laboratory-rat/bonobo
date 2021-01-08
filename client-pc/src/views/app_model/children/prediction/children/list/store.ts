@@ -6,14 +6,14 @@ import * as ERR from '@/infrastructure/core/Error';
 import * as NS from '@/infrastructure/services/NotifyService';
 import { AppState } from '@/store';
 import { ActionTree, Commit, GetterTree, Module, MutationTree } from 'vuex';
-import { EnumAppDatasetProcessType } from '@/infrastructure/dataset';
+import { EnumAppDatasetMetadataProcessType } from '@/infrastructure/dataset';
 
 export interface AppDatasetInfo {
   metadata: DS.AppDatasetMetadata;
   data: DS.AppDataset | null;
   inputsCount: number;
   outputsCount: number;
-  type: EnumAppDatasetProcessType;
+  type: EnumAppDatasetMetadataProcessType;
   disabled: boolean;
 }
 
@@ -131,14 +131,14 @@ export const actions: ActionTree<StoreAppModelPredictionListState, AppState> = {
         F.pipe(
           DS.scanMetadatas(),
           metadatas => metadatas
-            .filter(x => x.type != EnumAppDatasetProcessType.training)
+            .filter(x => x.datasetProcessType != EnumAppDatasetMetadataProcessType.training)
             .map(metadata => ({
               metadata: metadata,
-              inputsCount: metadata.colsInputsCount,
-              outputsCount: metadata.colsCount - metadata.colsInputsCount,
+              inputsCount: metadata.header.filter(x => !x.isOutput).length,
+              outputsCount: metadata.header.filter(x => x.isOutput).length,
               data: null,
-              type: metadata.type,
-              disabled: model.inputsCount != metadata.colsInputsCount || (metadata.type != EnumAppDatasetProcessType.prediction && model.outputsCount != (metadata.colsCount - metadata.colsInputsCount))
+              type: metadata.datasetProcessType,
+              disabled: model.inputsCount != metadata.header.filter(x => !x.isOutput).length || (metadata.datasetProcessType != EnumAppDatasetMetadataProcessType.prediction && model.outputsCount != metadata.header.filter(x => x.isOutput).length)
             }) as AppDatasetInfo),
           datasetsInfo => _commit(commit, {
             availableDatasets: datasetsInfo

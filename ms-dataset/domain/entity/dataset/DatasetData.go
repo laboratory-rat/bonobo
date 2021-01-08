@@ -6,21 +6,22 @@ import "bonobo.madrat.studio/ms/domain/enum"
 type DatasetDataEntity struct {
 	ID          string                    `json:"id"`
 	Name        string                    `json:"name"`
-	MetadataID  string                    `json:"metadata_id"`
-	UserID      string                    `json:"user_id"`
+	MetadataID  string                    `json:"metadataID"`
+	UserID      string                    `json:"userID"`
 	Header      []DatasetDataHeaderEntity `json:"header"`
 	Body        [][][]interface{}         `json:"body"`
-	CreatedTime int64                     `json:"created_time"`
-	UpdatedTime int64                     `json:"updated_time"`
+	CreatedTime int64                     `json:"createdTime"`
+	UpdatedTime int64                     `json:"updatedTime"`
 }
 
 // DatasetDataHeaderEntity - Explain data cols types and names
 type DatasetDataHeaderEntity struct {
-	OriginIndex int                 `json:"origin_index"`
+	OriginIndex int                 `json:"originIndex"`
 	Index       int                 `json:"index"`
 	Title       string              `json:"title"`
-	ColType     enum.DatasetColType `json:"col_type"`
+	ColType     enum.DatasetColType `json:"colType"`
 	Decimals    int8                `json:"decimals"`
+	IsOutput    bool                `json:"isOutput"`
 }
 
 // NewDatasetDataEntity - Create new data entity

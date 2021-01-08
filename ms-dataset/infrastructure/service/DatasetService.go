@@ -1,6 +1,7 @@
 package service
 
 import (
+	repomodel "bonobo.madrat.studio/ms/infrastructure/repository/model"
 	"fmt"
 	"math"
 	"sort"
@@ -11,8 +12,8 @@ import (
 	"bonobo.madrat.studio/ms/connector"
 	entity "bonobo.madrat.studio/ms/domain/entity/dataset"
 	"bonobo.madrat.studio/ms/domain/enum"
-	error "bonobo.madrat.studio/ms/domain/error"
-	model "bonobo.madrat.studio/ms/domain/model"
+	"bonobo.madrat.studio/ms/domain/error"
+	"bonobo.madrat.studio/ms/domain/model"
 	repointerface "bonobo.madrat.studio/ms/infrastructure/repository/interface"
 	"bonobo.madrat.studio/ms/utility"
 )
@@ -146,6 +147,8 @@ func (s *DatasetService) ReadSpreadsheetAndSave(spreadsheetID string) ([]*entity
 				Index:       colIndex,
 				OriginIndex: colIndex,
 				Title:       headers[colIndex],
+				Decimals:    0,
+				IsOutput:    false,
 			}
 		}
 
@@ -177,17 +180,41 @@ func (s *DatasetService) ReadSpreadsheetAndSave(spreadsheetID string) ([]*entity
 		return nil, error.New400("No datasets created", "no-datasets-created")
 	}
 
-	var metadatas []*entity.DatasetMetadataEntity
+	var metadataList []*entity.DatasetMetadataEntity
 	for _, dataset := range datasetsToSave {
 		metadata := entity.NewMetadataFromDataset(dataset, enum.DatasetSourceType_GoogleWorksheet, spreadsheetID)
 		if _, err := s.DatasetMetadataRepository.Create(metadata); err != nil {
 			s.Logger.Fatal(err)
 		} else {
-			metadatas = append(metadatas, metadata)
+			metadataList = append(metadataList, metadata)
 		}
 	}
 
-	return metadatas, nil
+	return metadataList, nil
+}
+
+// List return list of dataset metadata entities
+func (s *DatasetService) List(startAfter string, limit int) (*[]entity.DatasetMetadataEntity, *error.ServiceError) {
+	if limit < 1 {
+		return nil, error.New400("Limit can not be less then 1", "bed-model")
+	}
+
+	result, err := s.DatasetMetadataRepository.GetList(&repomodel.SearchFilter{
+		StartAfter: &startAfter,
+		Limit:      limit,
+		Query:      &map[string]string{
+			"IsTemporary": "false",
+			"IsArchived": "false",
+		},
+		OrederBy:   &map[string]bool{"created-time": true},
+	})
+
+	if err != nil {
+		s.Logger.Fatal(err)
+		return nil, error.New400("Can not read metadata", "service-error")
+	}
+
+	return result, nil
 }
 
 // Read - Read dataset
@@ -203,7 +230,7 @@ func (s *DatasetService) Read(metadataID string, skip int, limit int) (*entity.D
 	return dataset, nil
 }
 
-// Approve - Remove is templorary marker from dataset and delete extra columns
+// Approve - Remove is temporary marker from dataset and delete extra columns
 func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel) *error.ServiceError {
 	if len(m.Header) == 0 {
 		return error.New400("No entities selected", "bad-model")
@@ -220,7 +247,7 @@ func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel)
 		return m.Header[i].Index < m.Header[j].Index
 	})
 
-	updatedHeader := make([]entity.DatasetDataHeaderEntity, len(m.Header))
+	var updatedHeader []entity.DatasetDataHeaderEntity;
 
 	for _, entityHeader := range dataset.Header {
 		var matchHeader *model.DatasetApproveModelHeader
@@ -235,31 +262,33 @@ func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel)
 			continue
 		}
 
-		updatedHeader[matchHeader.Index] = entity.DatasetDataHeaderEntity{
+		updatedHeader = append(updatedHeader, entity.DatasetDataHeaderEntity{
 			ColType:     entityHeader.ColType,
 			Decimals:    matchHeader.Decimals,
 			Index:       matchHeader.Index,
 			OriginIndex: entityHeader.OriginIndex,
 			Title:       matchHeader.Title,
-		}
+			IsOutput:  matchHeader.IsOutput,
+		})
 	}
 
 	// oldYSize, newYSize := len(dataset.Header), len(updatedHeader)
 	dataset.Header = updatedHeader
-	updatedBody := make([][][]interface{}, len(dataset.Body))
-	for rowIndex, row := range dataset.Body {
-		updatedRow := make([][]interface{}, len(updatedHeader))
+	var updatedBody [][][]interface{}
+	for _, row := range dataset.Body {
+		var updatedRow [][]interface{};
 		for _, uh := range updatedHeader {
-			updatedRow[uh.Index] = row[uh.OriginIndex]
+			updatedRow = append(updatedRow, row[uh.OriginIndex])
 		}
 
-		updatedBody[rowIndex] = updatedRow
+		updatedBody = append(updatedBody, updatedRow)
 	}
 
 	dataset.Body = updatedBody
 	updatedMetadata := entity.NewMetadataFromDataset(dataset, metadata.SourceType, metadata.SourceReference)
 	updatedMetadata.ID = metadata.ID
 	dataset.MetadataID = updatedMetadata.ID
+	updatedMetadata.ProcessType = metadata.ProcessType
 	updatedMetadata.CreatedTime = metadata.CreatedTime
 	updatedMetadata.UpdatedTime = metadata.UpdatedTime
 	updatedMetadata.LastSyncTime = metadata.LastSyncTime
@@ -280,7 +309,7 @@ func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel)
 	return nil
 }
 
-// DeleteExpired - Delete all temporary and expired datasets with metadatas
+// DeleteExpired - Delete all temporary and expired datasets with metadata
 func (s *DatasetService) DeleteExpired() {
 	metadatas, err := s.DatasetMetadataRepository.GetExpired()
 	if err != nil {

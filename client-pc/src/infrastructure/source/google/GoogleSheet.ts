@@ -1,9 +1,9 @@
 import { GoogleSpreadsheet, GoogleSpreadsheetRow } from 'google-spreadsheet';
 import moment from 'moment';
-import { EnumAppDatasetColType } from '@/infrastructure/dataset';
 import * as IM from '@/infrastructure/core/IndexedMap';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AppError, createAppError } from '@/infrastructure/core';
+import { EnumAppDatasetMetadataColType } from '@/infrastructure/dataset';
 
 export interface SourceGoogleSheet {
   id: string;
@@ -25,7 +25,7 @@ export interface SourceGoogleWorksheetCol {
   originalIndex: number;
   title: string;
   values: object[];
-  type: EnumAppDatasetColType;
+  type: EnumAppDatasetMetadataColType;
   decimals: number | null;
 }
 
@@ -68,7 +68,7 @@ export const createFromGoogleSheet = (payload: GoogleSpreadsheet): TE.TaskEither
             include: true,
             originalIndex: titleIndex,
             title: title,
-            type: EnumAppDatasetColType.category,
+            type: EnumAppDatasetMetadataColType.STRING_ARRAY,
             values: valuesMap[titleIndex]
           };
         });

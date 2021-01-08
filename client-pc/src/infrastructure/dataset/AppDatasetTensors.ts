@@ -9,8 +9,10 @@ import * as TF from '@tensorflow/tfjs';
 import * as E from 'fp-ts/Either';
 import * as F from 'fp-ts/function';
 import * as DS from './';
+import { EnumAppDatasetMetadataColType } from './';
 import * as ERR from '@/infrastructure/core/Error';
 import * as IM from '@/infrastructure/core/IndexedMap';
+import { AppDataset } from '@/infrastructure/dataset/AppDataset';
 
 /**
  * Dataset tensors represintation
@@ -48,12 +50,92 @@ export interface AppDatasetTensors extends TF.TensorContainerObject {
 }
 
 /**
+ * Transform tensor to tensor with normalized data
+ *
+ * @param tensor
+ * @param min
+ * @param max
+ */
+export const normalizeTensor = <TRank extends TF.Rank>(tensor: TF.Tensor<TRank>, min?: TF.Tensor<TRank>, max?: TF.Tensor<TRank>): { tensor: TF.Tensor<TRank>; min: TF.Tensor<TRank>; max: TF.Tensor<TRank> } => {
+  min = tensor.min() as TF.Tensor<TRank>;
+  max = tensor.max() as TF.Tensor<TRank>;
+  const normTensor = tensor.clone()
+    .mul(max).sub(min)
+    .add(min) as TF.Tensor<TRank>;
+
+  return {
+    min,
+    max,
+    tensor: normTensor
+  };
+};
+
+/**
+ * Reverse tensor normalization
+ *
+ * @param normTensor
+ * @param min
+ * @param max
+ */
+export const unNormalizeTensor = <TRank extends TF.Rank>(normTensor: TF.Tensor<TRank>, min: TF.Tensor<TRank>, max: TF.Tensor<TRank>): TF.Tensor<TRank> =>
+  normTensor
+    .clone()
+    .mul(max.sub(min))
+    .add(min);
+
+const parseDatasetRow = (row: unknown[][], type: EnumAppDatasetMetadataColType) => {
+  switch (type) {
+    case EnumAppDatasetMetadataColType.NUMBER_ARRAY:
+      return row as number[][];
+    case EnumAppDatasetMetadataColType.STRING_ARRAY:
+      return row as string[][];
+    default:
+      throw 'Error';
+  }
+};
+
+/**
  * Options for @see {appDatasetToTensors} function
- * 
+ *
+ * TODO: only process 2D number arrays! Update for 3D / 2D strings
  * @typedef AppDatasetToTensorsOptions
  * @prop {boolean} normalize Do dataset normalize and return normalization info
- * @prop {boolean} shaffle Randomize dataset rows indexes
+ * @prop {boolean} shuffle Randomize dataset rows indexes
  */
+
+export const appDatasetToTensors2D = (options: {normalize: boolean; shuffle: boolean}) =>
+  (payload: AppDataset): E.Either<ERR.AppError, AppDatasetTensors> =>
+    F.pipe(
+      payload,
+      E.fromNullable((ERR.createAppError({message: 'Dataset is null'}))),
+      E.chain(_dataset =>
+        F.pipe(
+          options,
+          E.fromNullable((ERR.createAppError({message: 'Options is null'}))),
+          E.map(_o => ({
+            options: _o,
+            dataset: _dataset
+          }))
+        )),
+      E.map(_ => {
+        const {options, dataset} = _;
+        const pairs: { input: (string | number)[]; output: (string | number)[] }[] = [];
+        const _flatRow = (row: unknown[][], type: EnumAppDatasetMetadataColType): (string | number)[] => {
+          switch (type) {
+            case EnumAppDatasetMetadataColType.STRING_ARRAY:
+              return row.map((_) => _[0] as string);
+            case EnumAppDatasetMetadataColType.NUMBER_ARRAY:
+              return row.map((_) => _[0] as number);
+            default:
+              throw 'Unexpected error';
+          }
+        };
+
+
+        return E.left(ERR.createAppError({message: 'TEST'}));
+      }),
+      E.flatten
+    );
 
 /**
  * Convert app dataset to tensors bundle
@@ -113,10 +195,9 @@ export const appDatasetToTensors = (options: { normalize: boolean; shuffle: bool
                     inputMax,
                     inputMin,
                     labelMax,
-                    labelMin,
-                    isNormalized = false;
+                    labelMin;
 
-                  if (options.normalize && IM.length(dataset.cols) == IM.getEntities(dataset.cols).filter(({ value }) => [DS.EnumAppDatasetColType.number, DS.EnumAppDatasetColType.sequenceNumber].indexOf(value.type) != -1).length) {
+                  if (options.normalize && IM.length(dataset.cols) == IM.getEntities(dataset.cols).filter(({ value }) => [DS.EnumAppDatasetMetadataColType.NUMBER_ARRAY].indexOf(value.type) != -1).length) {
                     const normalizeInputResult = normalizeTensor(inputTensor);
                     inputMax = normalizeInputResult.max;
                     inputMin = normalizeInputResult.min;
@@ -140,7 +221,7 @@ export const appDatasetToTensors = (options: { normalize: boolean; shuffle: bool
                     size: pairs.length,
                     inputRank: pairs[0].input.length,
                     labelRank: pairs[0].output.length,
-                    isNormalized
+                    isNormalized: false,
                   } as DS.AppDatasetTensors;
                 }),
                 (error) => ERR.createAppError({ message: String(error) })
@@ -151,37 +232,3 @@ export const appDatasetToTensors = (options: { normalize: boolean; shuffle: bool
         )
       )
     );
-
-/**
- * Transform tensor to tensor with normalized data
- * 
- * @param tensor 
- * @param min 
- * @param max 
- */
-export const normalizeTensor = <TRank extends TF.Rank>(tensor: TF.Tensor<TRank>, min?: TF.Tensor<TRank>, max?: TF.Tensor<TRank>): { tensor: TF.Tensor<TRank>; min: TF.Tensor<TRank>; max: TF.Tensor<TRank> } => {
-  min = tensor.min() as TF.Tensor<TRank>;
-  max = tensor.max() as TF.Tensor<TRank>;
-  const normTensor = tensor.clone()
-    .mul(max).sub(min)
-    .add(min) as TF.Tensor<TRank>;
-
-  return {
-    min,
-    max,
-    tensor: normTensor
-  };
-};
-
-/**
- * Reverse tensor normalization
- * 
- * @param normTensor 
- * @param min 
- * @param max 
- */
-export const unNormalizeTensor = <TRank extends TF.Rank>(normTensor: TF.Tensor<TRank>, min: TF.Tensor<TRank>, max: TF.Tensor<TRank>): TF.Tensor<TRank> =>
-  normTensor
-    .clone()
-    .mul(max.sub(min))
-    .add(min);

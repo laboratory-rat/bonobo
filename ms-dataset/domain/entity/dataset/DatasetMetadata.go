@@ -11,27 +11,30 @@ import (
 type DatasetMetadataEntity struct {
 	ID               string                        `firestore:"id" json:"id"`
 	Name             string                        `firestore:"name" json:"name"`
-	UserID           string                        `firestore:"user_id" json:"user_id"`
+	UserID           string                        `firestore:"user_id" json:"userID"`
 	Header           []DatasetMetadataHeaderEntity `firestore:"header" json:"header"`
 	Examples         []DatasetMetadataColEntity    `firestore:"examples" json:"examples"`
 	Size             int                           `firestore:"size" json:"size"`
-	DatasetReference string                        `firestore:"dataset_reference" json:"dataset_reference"`
-	SourceType       enum.DatasetSourceType        `firestore:"source_type" json:"source_type"`
-	SourceReference  string                        `firestore:"source_reference" json:"source_reference"`
-	IsTemporary      bool                          `firestore:"is_temporary" json:"is_temporary"`
-	IsArchived       bool                          `firestore:"is_archived" json:"is_archived"`
-	CreatedTime      int64                         `firestore:"created_time" json:"created_time"`
-	UpdatedTime      int64                         `firestore:"updated_time" json:"updated_time"`
-	LastSyncTime     int64                         `firestore:"last_sync_time" json:"last_sync_time"`
-	ArchivedTime     int64                         `firestore:"archived_time" json:"archived_time"`
+	ProcessType      enum.DatasetProcessType       `firestore:"dataset_process_type" json:"datasetProcessType"`
+	DatasetReference string                        `firestore:"dataset_reference" json:"datasetReference"`
+	SourceType       enum.DatasetSourceType        `firestore:"source_type" json:"sourceType"`
+	SourceReference  string                        `firestore:"source_reference" json:"sourceReference"`
+	IsTemporary      bool                          `firestore:"is_temporary" json:"isTemporary"`
+	IsArchived       bool                          `firestore:"is_archived" json:"isArchived"`
+	CreatedTime      int64                         `firestore:"created_time" json:"createdTime"`
+	UpdatedTime      int64                         `firestore:"updated_time" json:"updatedTime"`
+	LastSyncTime     int64                         `firestore:"last_sync_time" json:"lastSyncTime"`
+	ArchivedTime     int64                         `firestore:"archived_time" json:"archivedTime"`
 }
 
 // DatasetMetadataHeaderEntity - Header preview
 type DatasetMetadataHeaderEntity struct {
 	Title       string              `firestore:"title" json:"title"`
 	Index       int                 `firestore:"index" json:"index"`
-	OriginIndex int                 `firestore:"origin_index" json:"origin_index"`
+	OriginIndex int                 `firestore:"originIndex" json:"originIndex"`
 	ColType     enum.DatasetColType `firestore:"type" json:"type"`
+	Decimals    int8                `firestore:"decimals" json:"decimals"`
+	IsOutput    bool                `firestore:"isOutput" json:"isOutput"`
 }
 
 // DatasetMetadataColEntity - Column representation
@@ -44,7 +47,7 @@ type DatasetMetadataCellEntity struct {
 	Value []interface{} `firestore:"value" json:"value"`
 }
 
-// NewMetadataFromDataset - Create new enity from data entity
+// NewMetadataFromDataset - Create new entity from data entity
 func NewMetadataFromDataset(dataset *DatasetDataEntity, sourceType enum.DatasetSourceType, sourceReference string) *DatasetMetadataEntity {
 	var header []DatasetMetadataHeaderEntity
 	var examples []DatasetMetadataColEntity
@@ -56,6 +59,8 @@ func NewMetadataFromDataset(dataset *DatasetDataEntity, sourceType enum.DatasetS
 			ColType:     h.ColType,
 			Index:       hIndex,
 			OriginIndex: hIndex,
+			IsOutput:    h.IsOutput,
+			Decimals:    h.Decimals,
 		})
 	}
 
@@ -72,6 +77,7 @@ func NewMetadataFromDataset(dataset *DatasetDataEntity, sourceType enum.DatasetS
 		ID:               utility.GenerateRandomId(),
 		Name:             dataset.Name,
 		UserID:           dataset.UserID,
+		ProcessType:      enum.DatasetProcessType_Training,
 		Header:           header,
 		Examples:         examples,
 		Size:             len(dataset.Body),

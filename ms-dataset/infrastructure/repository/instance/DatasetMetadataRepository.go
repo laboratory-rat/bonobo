@@ -43,7 +43,7 @@ func (r *DatasetMetadataRepository) Create(e *entity.DatasetMetadataEntity) (*en
 }
 
 func (r *DatasetMetadataRepository) GetList(filter *repomodel.SearchFilter) (*[]entity.DatasetMetadataEntity, error) {
-	ref := r.collection().OrderBy("created_time", firestore.Desc).Limit(filter.Limit)
+	ref := r.collection().Where("is_archived", "==",false).Where("is_temporary", "==", false).OrderBy("created_time", firestore.Desc).Limit(filter.Limit)
 	if filter.StartAfter != nil {
 		ref.StartAfter(filter.StartAfter)
 	}

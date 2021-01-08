@@ -5,76 +5,60 @@
  * @module AppDataset
  */
 
-import { EnumAppDatasetSource, EnumAppDatasetProcessType } from './enums';
-import { AppDataset, readDatasetRow } from './AppDataset';
-import { AppError, createAppError, generageId as generateId } from '../core';
-import moment from 'moment';
-import * as E from 'fp-ts/Either';
-import * as F from 'fp-ts/function';
+import {
+  EnumAppDatasetMetadataColType,
+  EnumAppDatasetMetadataProcessType,
+  EnumAppDatasetMetadataSourceType
+} from './enums';
 
 /**
- * @ignore
- */
-const datasetIdLength = 8;
-
-/**
- * App dataset metadata.
- * Contains short dataset info but no raw data inside.
- * 
- * @caption Must be sync with actual dataset
+ * App metadata from BE
  */
 export interface AppDatasetMetadata {
-  /** Dataset id */
   id: string;
-
-  /** Dataset naem */
   name: string;
-
-  /** Dataset created time */
+  userID: string;
+  header: AppDatasetMetadataHeader[];
+  examples: AppDatasetMetadataCol[];
+  size: number;
+  datasetProcessType: EnumAppDatasetMetadataProcessType;
+  datasetReference: string;
+  sourceType: EnumAppDatasetMetadataSourceType;
+  sourceReference: string;
+  isTemporary: boolean;
+  isArchived: boolean;
   createdTime: number;
-
-  /** Dataset updated time */
   updatedTime: number;
-
-  /** Dataset source type */
-  source: EnumAppDatasetSource;
-
-  /** How to process dataset type */
-  type: EnumAppDatasetProcessType;
-
-  /** Columns count */
-  colsCount: number;
-
-  /** Columns that used as input count */
-  colsInputsCount: number;
-
-  /** Origin source id if any */
-  sourceId?: string;
-
-  /** Source index (worksheet index) */
-  sourceIndex: number;
+  lastSyncTime?: number;
+  archivedTime?: number;
 }
 
 /**
- * Create metadata from exists dataset
- * 
- * @param dataset Dataset to process
+ * Metadata header
+ * Present column types and names
  */
-export const createAppDatasetMetadata = (dataset: AppDataset): E.Either<AppError, AppDatasetMetadata> =>
-  F.pipe(
-    dataset,
-    E.fromNullable(createAppError({ message: 'Dataset is null' })),
-    E.map(readDatasetRow(0)),
-    E.chain(E.map(firstRow => ({
-      colsCount: firstRow.input.length + firstRow.output.length,
-      colsInputsCount: firstRow.input.length,
-      createdTime: moment.utc().unix(),
-      id: generateId(datasetIdLength),
-      name: dataset.name,
-      source: dataset.source,
-      type: dataset.processType,
-      updatedTime: moment.utc().unix(),
-      sourceIndex: dataset.sourceIndex,
-      sourceId: dataset.sourceId
-    }) as AppDatasetMetadata))
-  );
+export interface AppDatasetMetadataHeader {
+  title: string;
+  index: number;
+  decimals: number;
+  originIndex: number;
+  type: EnumAppDatasetMetadataColType;
+  isOutput: boolean;
+}
+
+export interface AppDatasetMetadataCol {
+  value: AppDatasetMetadataCell[];
+}
+
+export interface AppDatasetMetadataCell {
+  value: unknown[];
+}
+
+/**
+ * AppDatasetMetadataApprove
+ * Approve created metadata
+ */
+export interface AppDatasetMetadataApprove {
+  name: string;
+  header: AppDatasetMetadataHeader[];
+}

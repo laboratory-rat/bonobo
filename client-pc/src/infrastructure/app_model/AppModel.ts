@@ -35,8 +35,8 @@ export const createAppModelFromDatasetMetadata = (metadata: AppDatasetMetadata, 
   createdTime: moment().unix(),
   updatedTime: moment().unix(),
   datasetId: metadata.id,
-  inputsCount: metadata.colsInputsCount,
-  outputsCount: metadata.colsCount - metadata.colsInputsCount,
+  inputsCount: metadata.header.filter(x => !x.isOutput).length,
+  outputsCount: metadata.header.filter(x => x.isOutput).length,
   trained: false,
   ...payload
 });
