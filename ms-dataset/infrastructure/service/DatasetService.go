@@ -288,7 +288,7 @@ func (s *DatasetService) Approve(metadataID string, m model.DatasetApproveModel)
 	updatedMetadata := entity.NewMetadataFromDataset(dataset, metadata.SourceType, metadata.SourceReference)
 	updatedMetadata.ID = metadata.ID
 	dataset.MetadataID = updatedMetadata.ID
-	updatedMetadata.ProcessType = metadata.ProcessType
+	updatedMetadata.ProcessType = m.DatasetProcessType
 	updatedMetadata.CreatedTime = metadata.CreatedTime
 	updatedMetadata.UpdatedTime = metadata.UpdatedTime
 	updatedMetadata.LastSyncTime = metadata.LastSyncTime

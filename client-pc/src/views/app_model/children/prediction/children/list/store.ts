@@ -2,11 +2,15 @@ import * as AM from '@/infrastructure/app_model';
 import * as DS from '@/infrastructure/dataset';
 import * as F from 'fp-ts/function';
 import * as E from 'fp-ts/Either';
+import * as TE from 'fp-ts/TaskEither';
 import * as ERR from '@/infrastructure/core/Error';
 import * as NS from '@/infrastructure/services/NotifyService';
 import { AppState } from '@/store';
 import { ActionTree, Commit, GetterTree, Module, MutationTree } from 'vuex';
 import { EnumAppDatasetMetadataProcessType } from '@/infrastructure/dataset';
+import { getAppDI } from '@/di/AppDI';
+
+const datasetRepository = () => getAppDI().datasetRepository;
 
 export interface AppDatasetInfo {
   metadata: DS.AppDatasetMetadata;
@@ -45,7 +49,6 @@ const _defaultState = (): StoreAppModelPredictionListState => ({
   predictionResults: [],
   availableDatasets: []
 });
-
 
 export enum EnumStoreAppModelPredictionListGetters {
   isInProgress = 'IS_IN_PROGRESS',
@@ -90,6 +93,10 @@ const _commit = <T>(commit: Commit, newState: Partial<StoreAppModelPredictionLis
   return obj;
 };
 
+const _commitSimple = (commit: Commit, newState: Partial<StoreAppModelPredictionListState>) => {
+  commit(_mutations.update, newState);
+};
+
 export const actions: ActionTree<StoreAppModelPredictionListState, AppState> = {
   [_actions.setModel]: ({ commit, state }, payload: { id: string }): E.Either<ERR.AppError, unknown> =>
     F.pipe(
@@ -127,29 +134,38 @@ export const actions: ActionTree<StoreAppModelPredictionListState, AppState> = {
     F.pipe(
       state.modelMetadata,
       E.fromNullable(ERR.createAppError({ message: 'Model is null' })),
-      E.map(model =>
+      TE.fromEither,
+      TE.chain(model =>
         F.pipe(
-          DS.scanMetadatas(),
-          metadatas => metadatas
-            .filter(x => x.datasetProcessType != EnumAppDatasetMetadataProcessType.training)
-            .map(metadata => ({
-              metadata: metadata,
-              inputsCount: metadata.header.filter(x => !x.isOutput).length,
-              outputsCount: metadata.header.filter(x => x.isOutput).length,
-              data: null,
-              type: metadata.datasetProcessType,
-              disabled: model.inputsCount != metadata.header.filter(x => !x.isOutput).length || (metadata.datasetProcessType != EnumAppDatasetMetadataProcessType.prediction && model.outputsCount != metadata.header.filter(x => x.isOutput).length)
-            }) as AppDatasetInfo),
-          datasetsInfo => _commit(commit, {
-            availableDatasets: datasetsInfo
-          })(datasetsInfo)
+          datasetRepository().List({
+            limit: 100,
+          }),
+          TE.map(metadataList => metadataList.filter(x => x.datasetProcessType != EnumAppDatasetMetadataProcessType.training)),
+          TE.map(list => list.map(md => ({
+            metadata: md,
+            data: null,
+            type: md.datasetProcessType,
+            inputsCount: md.header.filter(x => !x.isOutput).length,
+            outputsCount: md.header.filter(x => x.isOutput).length,
+            disabled: model.inputsCount != md.header.filter(x => !x.isOutput).length
+,          }) as AppDatasetInfo)),
         )
       ),
-      E.fold(
-        NS.toastError,
-        () => undefined
+      TE.fold(
+        (err) => {
+          NS.toastError(err);
+          return TE.left(err);
+        },
+        (_) => {
+          console.log(_);
+          _commitSimple(commit, {
+            availableDatasets: _
+          });
+          return TE.right(_);
+        }
       )
-    ),
+    )(),
+
   [_actions.createPredictionMetadata]: ({ state }, payload: AppModelPredictionMetadataCreateModel): E.Either<ERR.AppError, AM.AppModelPredictionMetadata> =>
     F.pipe(
       state.modelMetadata,
@@ -163,6 +179,10 @@ export const actions: ActionTree<StoreAppModelPredictionListState, AppState> = {
       })),
       E.map(AM.createAppModelPredictionMetadata),
       E.chain(AM.writeAppModelPredictionMetadata),
+      E.mapLeft(err => {
+        NS.toastError(err);
+        return err;
+      })
     )
 };
 

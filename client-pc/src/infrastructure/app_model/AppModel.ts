@@ -27,7 +27,12 @@ export interface AppModel {
   outputsCount: number;
   createdTime: number;
   updatedTime: number;
+  finalResult?: AppModelFinalLoss;
   trained: boolean;
+}
+
+export interface AppModelFinalLoss {
+  [label: string]: number[];
 }
 
 export const createAppModelFromDatasetMetadata = (metadata: AppDatasetMetadata, payload: { name: string; type: EnumAppModelType; subtype: EnumAppModelSubtype; options: AppModelOptions; trainingSplit: number; trainingEpochsLimit: number }): AppModel => ({
@@ -37,6 +42,7 @@ export const createAppModelFromDatasetMetadata = (metadata: AppDatasetMetadata, 
   datasetId: metadata.id,
   inputsCount: metadata.header.filter(x => !x.isOutput).length,
   outputsCount: metadata.header.filter(x => x.isOutput).length,
+  finalResult: {},
   trained: false,
   ...payload
 });

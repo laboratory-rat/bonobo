@@ -12,13 +12,23 @@ import { applyTFLossFromAppLoss } from '../../loss';
 import { applyAppModelOptimizer as applyTFOptimizerFromAppOptimizer } from '../../optimizer';
 import moment from 'moment';
 import { AppModelNormailzationData } from '../../AppModelNormalizationData';
-import { readAppModelNormalization, writeAppModelNormalization } from '../../file';
+import {
+  readAppModelNormalization,
+  writeAppModelNormalization
+} from '../../file';
+import { AppDatasetTensors, tensorTo2DMatrix } from '@/infrastructure/dataset';
+import { AppModelOptionsSequentialSimple } from '@/infrastructure/app_model/options/sequential';
+import { createAppError } from '@/infrastructure/core/Error';
+import { generageId } from '@/infrastructure/core';
+import { AppModel, activationTypeToTFActivation } from '@/infrastructure/app_model';
 
 /**
  * Create AppTFModel sequential simple from AppModel
  * @param appModel App model with sequential simple options
  */
-export const createAppTFModelSequentialSimple = (appModel: AM.AppModel): E.Either<ER.AppError, AM.AppTFModel> =>
+export const createAppTFModelSequentialSimple = (
+  appModel: AM.AppModel
+): E.Either<ER.AppError, AM.AppTFModel> =>
   F.pipe(
     appModel,
     E.fromNullable(ER.createAppError({ message: 'Model is null' })),
@@ -26,35 +36,44 @@ export const createAppTFModelSequentialSimple = (appModel: AM.AppModel): E.Eithe
     E.fromNullable(ER.createAppError({ message: 'Bad options type' })),
     E.chain(
       E.map(options => {
-        console.log(options.layers);
         const model = TF.sequential();
+        const inputShape = [appModel.inputsCount];
+
+        // add input
+        model.add(TF.layers.inputLayer({
+          inputShape: inputShape
+        }));
 
         // add input / hidden layers
-        let inputShape = [appModel.inputsCount];
         for (const layer of options.layers) {
-          model.add(TF.layers.dense({
-            inputShape: inputShape,
-            units: layer.units,
-            useBias: layer.useBias,
-            activation: layer.activation
-          }));
+          model.add(
+            TF.layers.dense({
+              // inputShape: inputShape,
+              units: layer.units,
+              useBias: layer.useBias,
+              activation: activationTypeToTFActivation(layer.activation)
+            })
+          );
 
-          inputShape = [layer.units];
+          // inputShape = [layer.units, 1];
         }
 
         // add output
         model.add(TF.layers.dense({
-          inputShape: inputShape,
+          // inputShape: inputShape,
           units: appModel.outputsCount,
-          activation: options.output.activation,
+          activation: activationTypeToTFActivation(options.output.activation)
         }));
 
         const modelArgs = F.pipe(
           {
-            metrics: ['mse']
+            metrics: ['mse', 'accuracy']
           } as TF.ModelCompileArgs,
           applyTFLossFromAppLoss(options.loss),
-          applyTFOptimizerFromAppOptimizer(options.optimizer)
+          applyTFOptimizerFromAppOptimizer(
+            options.optimizer,
+            options.learningRate
+          )
         );
 
         model.compile(modelArgs);
@@ -67,40 +86,33 @@ export const createAppTFModelSequentialSimple = (appModel: AM.AppModel): E.Eithe
  * AppTFModel of sequential simple
  * @param payload App model and dataset for training
  */
-export const trainAppTFModelSequentialSimple = (payload: { model: AM.AppModel; dataset: DS.AppDataset; logCallback?: AM.AppTFTrainProcessLogCallback }) => (tfModel: AM.AppTFModel): TE.TaskEither<ER.AppError, TF.History> =>
+export const trainAppTFModelSequentialSimple = (payload: {
+  model: AM.AppModel;
+  tensors: AppDatasetTensors;
+  logCallback?: AM.AppTFTrainProcessLogCallback;
+}) => (tfModel: AM.AppTFModel): TE.TaskEither<ER.AppError, TF.History> =>
   F.pipe(
     payload,
     E.fromNullable(ER.createAppError({ message: 'No arguments provided!' })),
     E.chain(p => {
-      if (!p.dataset) return E.left(ER.createAppError({ message: 'Dataset not provided' }));
-      if (!p.model) return E.left(ER.createAppError({ message: 'Model is not provided' }));
-      if (!tfModel) return E.left(ER.createAppError({ message: 'TF model is not provided' }));
+      if (!p.tensors)
+        return E.left(ER.createAppError({ message: 'Tensors not provided' }));
+      if (!p.model)
+        return E.left(ER.createAppError({ message: 'Model is not provided' }));
+      if (!tfModel)
+        return E.left(
+          ER.createAppError({ message: 'TF model is not provided' })
+        );
       return E.right({
         ...p,
-        tf: tfModel
+        tf: tfModel,
+        options: p.model.options as S.AppModelOptionsSequentialSimple
       });
     }),
-    E.chain(x =>
-      F.pipe(
-        x.dataset,
-        E.fromNullable(ER.createAppError({ message: 'Dataset is null' })),
-        E.map(ds => {
-          const options = x.model.options as S.AppModelOptionsSequentialSimple;
-          return DS.appDatasetToTensors({
-            normalize: options.normalizeDataset,
-            shuffle: options.shuffleDataset
-          })(ds);
-        }),
-        E.flatten,
-        E.map(tensors => ({
-          ...x,
-          tensors: tensors,
-          options: x.model.options as S.AppModelOptionsSequentialSimple
-        }))
-      )
-    ),
     TE.fromEither,
-    TE.chain(payload => /// write normalization file if required
+    TE.chain((
+      payload /// write normalization file if required
+    ) =>
       TE.tryCatch(
         async () => {
           const { tensors, model } = payload;
@@ -121,110 +133,145 @@ export const trainAppTFModelSequentialSimple = (payload: { model: AM.AppModel; d
 
           return payload;
         },
-        (reason) => ER.createAppError({ message: String(reason) })
-      )),
-    TE.chain(
-      ({ tf, tensors, model, options }) =>
-        TE.tryCatch(
-          () => tf.fit(tensors.inputTensor, tensors.labelTensor!, {
+        reason => ER.createAppError({ message: String(reason) })
+      )
+    ),
+    TE.chain(({ tf, tensors, model, options }) =>
+      TE.tryCatch(
+        () =>
+          tf.fit(tensors.inputTensor, tensors.labelTensor!, {
             batchSize: options.batchSize ?? undefined,
             epochs: model.trainingEpochsLimit,
             shuffle: options.shuffleDataset,
             validationSplit: model.trainingSplit,
-            callbacks: payload.logCallback as TF.CustomCallbackArgs
+            callbacks: [
+              // TF.callbacks.earlyStopping({
+              //   monitor: 'val_mse',
+              //   mode: 'min',
+              //   minDelta: 0.0001,
+              //   patience: 25
+              // }),
+              new TF.CustomCallback(
+                payload.logCallback as TF.CustomCallbackArgs
+              )
+            ]
           }),
-          (reason) => ER.createAppError({ message: String(reason) })
-        )
-    ),
+        reason => ER.createAppError({ message: String(reason) })
+      )
+    )
   );
 
-export const validateAppTFModelSequentialSimple = (payload: { model: AM.AppModel; dataset: DS.AppDataset; logCallback?: AM.AppTFTrainProcessLogCallback }) => (tfModel: AM.AppTFModel): TE.TaskEither<ER.AppError, AM.AppModelPredictionResult | unknown> =>
+export const validateAppTFModelSequentialSimple = (payload: {
+  model: AM.AppModel;
+  tensors: AppDatasetTensors;
+  logCallback?: AM.AppTFTrainProcessLogCallback;
+}) => (
+  tfModel: AM.AppTFModel
+): TE.TaskEither<ER.AppError, AM.AppModelPredictionResult> =>
   F.pipe(
     payload,
-    E.fromNullable(ER.createAppError({ message: 'Validation payload is null' })),
+    E.fromNullable(
+      ER.createAppError({ message: 'Validation payload is null' })
+    ),
     E.chain(p => {
-      if (!p.dataset) return E.left(ER.createAppError({ message: 'Dataset is null' }));
-      if (!p.model) return E.left(ER.createAppError({ message: 'Model is null' }));
-      if (!tfModel) return E.left(ER.createAppError({ message: 'TF model is null' }));
+      if (!p.tensors)
+        return E.left(ER.createAppError({ message: 'Tensors is null' }));
+      if (!p.model)
+        return E.left(ER.createAppError({ message: 'Model is null' }));
+      if (!tfModel)
+        return E.left(ER.createAppError({ message: 'TF model is null' }));
       return E.right({
         ...p,
         tf: tfModel
       });
     }),
-    E.chain(data =>
-      F.pipe(
-        data.dataset,
-        DS.appDatasetToTensors({ normalize: (data.model.options as S.AppModelOptionsSequentialSimple).normalizeDataset, shuffle: false }),
-        E.fold(
-          err => E.left(err),
-          (tensors) => E.right({
-            ...data,
-            tensors,
-            options: data.model.options as S.AppModelOptionsSequentialSimple
-          })
-        )
-      )
-    ),
     TE.fromEither,
-    TE.chain(payload => {
-      const { options, model } = payload;
-      if (options.normalizeDataset) {
-        F.pipe(
-          model.id,
-          readAppModelNormalization,
-          TE.map(nData => {
-            nData
-          })
-        )()
-      }
-
-      return TE.right(payload);
-    }),
-    TE.chain(({ tf, tensors, dataset, model }) =>
+    TE.chain(({ tf, tensors, model }) =>
       TE.tryCatch(
         async () => {
-          const [xs, preds] = TF.tidy(() => {
-            let preds = tf.predict(tensors.inputTensor.reshape([tensors.size, tensors.inputRank])) as TF.Tensor;
+          const start = moment().unix();
+          const [xs, preds, correct] = TF.tidy(() => {
+            let preds = tf.predict(
+              tensors.inputTensor.reshape([tensors.size, tensors.inputRank])
+            ) as TF.Tensor;
             let xs: TF.Tensor = tensors.inputTensor;
+            let correct: TF.Tensor = tensors.labelTensor!;
             if (tensors.isNormalized) {
-              preds = DS.unNormalizeTensor(preds, tensors.labelMin!, tensors.labelMax!);
-              xs = DS.unNormalizeTensor(xs, tensors.inputMin!, tensors.inputMax!);
+              preds = DS.unNormalizeTensor(
+                preds,
+                tensors.labelMin!,
+                tensors.labelMax!
+              );
+              xs = DS.unNormalizeTensor(
+                xs,
+                tensors.inputMin!,
+                tensors.inputMax!
+              );
+              correct = DS.unNormalizeTensor(
+                correct,
+                tensors.labelMin!,
+                tensors.labelMax!
+              );
             }
 
-            return [xs.dataSync(), preds.dataSync()];
+            return [xs, preds, correct];
           });
 
-
-          // const
-          //   inputs = U.arrayChunk([...xs], model.inputsCount),
-          //   outputs = U.arrayChunk([...preds], model.outputsCount);
-
-          // let corrects;
-          // if (tensors.labelTensor) {
-          //   let correctUnNormal = tensors.labelTensor.dataSync();
-          //   corrects = tensors.isNormalized ? DS.unNormalizeTensor(correctUnNormal as, tensors.labelMin!, tensors.labelMax!) : correctUnNormal;
-          // }
-          // corrects = tensors.inputTensor
-          //   ? U.arrayChunk([tensors.])
-
-
-          // let chunkedOutputs = [];
-          const correctResults = null;
-          const ys = tensors.labelTensor?.dataSync();
-          if (ys) {
-            // correctResults = AM.chunk([...ys], 1);
-          }
-
-          return null;
-          // return {
-          //   createdTime: moment().unix(),
-          //   datasetId: dataset.id,
-          //   correctData: tensors?.labelTensor?.dataSync(),
-          //   datasetName: '',
-          //   id: '',
-          //   inputData: [],
-          // } as AM.AppModelPredictionResult;
+          return {
+            createdTime: moment().unix(),
+            finishedTime: moment().unix(),
+            datasetId: model.datasetId,
+            datasetName: '',
+            id: generageId(8),
+            inputLabels: [],
+            outputLabels: [],
+            isValidation: true,
+            correctData: tensorTo2DMatrix(correct),
+            inputData: tensorTo2DMatrix(xs),
+            modelId: model.id,
+            modelName: model.name,
+            outputData: tensorTo2DMatrix(preds),
+            startedTime: start
+          } as AM.AppModelPredictionResult;
         },
-        (reason) => ER.createAppError({ message: String(reason) })
-      ))
+        reason => ER.createAppError({ message: String(reason) })
+      )
+    )
   );
+
+/**
+ * Create auto naming for model
+ * @param model
+ */
+export const createNameAppTFModelSequentialSimple = (
+  model: AppModel
+): string => {
+  const options = model.options as AppModelOptionsSequentialSimple;
+  const s = [];
+  options.normalizeDataset && s.push('NORM');
+  options.shuffleDataset && s.push('SHUFFLE');
+  options.batchSize &&
+    options.batchSize > 0 &&
+    s.push(`BATCH-${options.batchSize}`);
+  options.learningRate && s.push(`LR-${options.learningRate}`);
+  options.loss && s.push(`LOSS-${options.loss}`);
+  options.optimizer && s.push(`OPTIMIZER-${options.optimizer}`);
+  if (options.layers && options.layers.length) {
+    options.layers.forEach(layer => {
+      const ls = [];
+      layer.units && layer.units > 0 && ls.push(layer.units);
+      layer.activation && ls.push(layer.activation);
+      layer.useBias && ls.push('BIAS');
+      s.push(`(${ls.join('_')})`);
+    });
+  }
+
+  if (options.output) {
+    const os = [];
+    options.output.activation && os.push(options.output.activation);
+    options.output.useBias && os.push('BIAS');
+    s.push(`[${os.join('_')}]`);
+  }
+
+  return s.join('_');
+};

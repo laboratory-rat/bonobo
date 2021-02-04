@@ -8,6 +8,7 @@
           v-model.number="options.learningRate"
           type="number"
           label="Learning rate *"
+          @input='onUpdate'
         />
       </div>
       <div class="col-6">
@@ -17,12 +18,13 @@
           v-model.number="options.batchSize"
           type="number"
           label="Batch size"
+          @input='onUpdate'
         >
           <template v-slot:append v-if="!!options.batchSize">
             <q-icon
               class="cursor-pointer"
               name="close"
-              @click.stop="options.batchSize = null"
+              @click.stop="clearBatchSize"
             />
           </template>
         </q-input>
@@ -38,12 +40,14 @@
           filled
           map-options
           emit-value
+          @input='onUpdate'
         />
       </div>
       <div class="col-6">
         <q-checkbox
           label="Normalize dataset"
           v-model="options.normalizeDataset"
+          @input='onUpdate'
         />
       </div>
       <div class="col-6">
@@ -57,10 +61,11 @@
           filled
           map-options
           emit-value
+          @input='onUpdate'
         />
       </div>
       <div class="col-6">
-        <q-checkbox label="Shuffle dataset" v-model="options.shuffleDataset" />
+        <q-checkbox label="Shuffle dataset" @input='onUpdate' v-model="options.shuffleDataset" />
       </div>
     </div>
     <div>
@@ -89,6 +94,8 @@
                 filled
                 type="number"
                 v-model.number="layer.units"
+                debounce='300'
+                @input='onUpdate'
               />
             </td>
             <td>
@@ -101,10 +108,11 @@
                 filled
                 map-options
                 emit-value
+                @input='onUpdate'
               />
             </td>
             <td>
-              <q-checkbox v-model="layer.useBias" dense />
+              <q-checkbox v-model="layer.useBias" @input='onUpdate' dense />
             </td>
             <td style="width: 64px;">
               <q-btn
@@ -131,12 +139,14 @@
             map-options
             emit-value
             label="Activation"
+            @input='onUpdate'
           />
         </div>
         <div class="col-6">
           <q-checkbox
             label="Use output bias"
             v-model="options.output.useBias"
+            @input='onUpdate'
           />
         </div>
       </div>
@@ -146,7 +156,7 @@
 
 <script lang="ts">
 import Vue from 'vue';
-import { Component, Model } from 'vue-property-decorator';
+import { Component, Model, Emit, Watch } from 'vue-property-decorator';
 import * as MSS from '@/infrastructure/app_model/options/sequential/simple';
 import * as Activation from '@/infrastructure/app_model/activation';
 import { KeyLabelStringIterable } from '@/infrastructure/core';
@@ -161,6 +171,11 @@ import {
 export default class OptionSequentialSimpleComponent extends Vue {
   @Model()
   options!: MSS.AppModelOptionsSequentialSimple;
+
+  @Emit('on:update')
+  onUpdate() {
+    return this.options;
+  }
 
   get appActivationTypesList(): KeyLabelStringIterable<
     Activation.AppActivationType
@@ -178,10 +193,17 @@ export default class OptionSequentialSimpleComponent extends Vue {
 
   clickAddLayer() {
     this.options.layers.push(MSS.defaultAppModelOptionsSequentialSimpleLayer());
+    this.onUpdate();
   }
 
   clickDeleteLayer(layerIndex: number) {
     this.options.layers.splice(layerIndex, 1);
+    this.onUpdate();
+  }
+
+  clearBatchSize() {
+    this.options.batchSize = null;
+    this.onUpdate();
   }
 }
 </script>

@@ -25,6 +25,8 @@
             </q-card-section>
             <q-menu touch-position>
               <q-list style="min-width: 100px">
+                <template v-if='isDatasetTrain(meta)'>
+
                 <q-item
                   clickable
                   v-close-popup
@@ -32,6 +34,13 @@
                 >
                   <q-item-section>Create model</q-item-section>
                 </q-item>
+                </template>
+                <template v-else-if='isDatasetValidate'>
+                  <q-item clickable v-close-popup>
+                    <q-item-section>Validate</q-item-section>
+                  </q-item>
+                </template>
+
                 <q-item clickable v-close-popup>
                   <q-item-section>View</q-item-section>
                 </q-item>
@@ -57,14 +66,11 @@
 </template>
 
 <script lang="ts">
-import { AppDatasetMetadata } from '@/infrastructure/dataset';
+import { AppDatasetMetadata, EnumAppDatasetMetadataProcessType } from '@/infrastructure/dataset';
 import Vue from 'vue';
 import Component from 'vue-class-component';
 import { Action, Getter } from 'vuex-class';
-import {
-  EnumStoreDatasetListGetters as getters,
-  EnumStoreDatasetListActions as actions
-} from './store';
+import { EnumStoreDatasetListActions as actions, EnumStoreDatasetListGetters as getters } from './store';
 import AppModelCreateDialog from '../../../app_model/dialogs/create.dialog.vue';
 import * as AM from '@/infrastructure/app_model';
 import * as E from 'fp-ts/Either';
@@ -87,6 +93,14 @@ export default class DatasetListView extends Vue {
 
   @Action(`${STORE}/${actions.deleteById}`)
   _actionDeleteDatasetById!: (payload: { id: string }) => void;
+
+  isDatasetTrain(dataset: AppDatasetMetadata): boolean {
+    return dataset.datasetProcessType == EnumAppDatasetMetadataProcessType.training;
+  }
+
+  isDatasetValidate(dataset: AppDatasetMetadata): boolean {
+    return dataset.datasetProcessType == EnumAppDatasetMetadataProcessType.validation;
+  }
 
   onCreateModelClick(metadata: AppDatasetMetadata) {
     this.$q

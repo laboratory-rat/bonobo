@@ -12,7 +12,10 @@
                 <div>
                   <div class="text-subtitle1">{{ model.name }}</div>
                   <div class="text-caption">
-                    <span v-if="model.trained">Trained</span>
+                    <div v-if="model.trained">
+                    <span>Trained</span>
+                      <span>{{model.finalResult}}</span>
+                    </div>
                     <span v-else>Not trained</span>
                   </div>
                 </div>
@@ -31,31 +34,29 @@
               />
             </q-card-actions>
             <q-slide-transition>
-              <div v-show="expandedModelsList.indexOf($index) !== -1">
-                <q-separator />
-                <q-card-section>
-                  <code class="text-pre">
-                    {{ model }}
-                  </code>
-                </q-card-section>
+              <div
+                v-show="expandedModelsList.indexOf($index) !== -1"
+                @click.stop="() => {}"
+              >
+                <json-tree :level="1" :data="model" />
               </div>
             </q-slide-transition>
             <q-menu touch-position>
               <q-list style="min-width: 100px">
-                <q-item
-                  v-if="!model.trained"
-                  clickable
-                  v-close-popup
-                  @click="onClickTrain(model)"
-                >
+                <q-item clickable v-close-popup @click="onClickTrain(model)">
                   <q-item-section>
-                    <span>Train model</span>
+                    <span v-if="!model.trained">Train model</span>
+                    <span v-else>See train results</span>
                   </q-item-section>
                 </q-item>
                 <q-item
                   clickable
                   v-close-popup
-                  :to="{ name: 'model-prediction-list', params: { id: model.id } }"
+                  v-if="model.trained"
+                  :to="{
+                    name: 'model-prediction-list',
+                    params: { id: model.id }
+                  }"
                 >
                   <q-item-section>
                     <span>Predict with model</span>
@@ -91,10 +92,15 @@ import {
   EnumStoreAppModelListActions as actions
 } from './store';
 import * as AM from '@/infrastructure/app_model';
+import JsonTree from 'vue-json-tree';
 
 const storeList = namespace('model/list');
 
-@Component
+@Component({
+  components: {
+    JsonTree
+  }
+})
 export default class AppModelListView extends Vue {
   @storeList.Getter(getters.list)
   list!: AM.AppModel[];

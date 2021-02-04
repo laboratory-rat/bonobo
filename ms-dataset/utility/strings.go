@@ -26,10 +26,10 @@ func IntFromString(s string) (int, error) {
 }
 
 // Is string contains only numbers and .
-var IsStringNumber = regexp.MustCompile(`^[0-9.]*$`).MatchString
+var IsStringNumber = regexp.MustCompile(`^[0-9.,-]*$`).MatchString
 
 // Is string contains letters / numbers / _
-var IsStringAlphabetic = regexp.MustCompile(`^[a-zA-Z0-9_]*$`).MatchString
+var IsStringAlphabetic = regexp.MustCompile(`^[a-zA-Z0-9_ ]*$`).MatchString
 
 // Is string contains array of values
 var IsStringJsonArray = regexp.MustCompile(`^\[.*\]$`).MatchString

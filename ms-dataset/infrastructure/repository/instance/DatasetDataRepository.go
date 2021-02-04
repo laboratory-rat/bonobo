@@ -99,12 +99,38 @@ func (r *DatasetDataRepository) Read(id string) (*entity.DatasetDataEntity, erro
 }
 
 func (r *DatasetDataRepository) Update(entity *entity.DatasetDataEntity) (*entity.DatasetDataEntity, error) {
-	err := r.Delete(entity.ID)
+	now := time.Now().Unix()
+	entity.UpdatedTime = now
+
+	bucket := r.Bucket
+	content, err := json.Marshal(entity)
 	if err != nil {
+		r.Logger.Panic(err)
 		return nil, err
 	}
 
-	return r.Create(entity)
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+	defer cancel()
+
+	wc := bucket.Object(getPath(entity.ID)).NewWriter(ctx)
+	wc.ContentType = "application/json"
+	wc.Metadata = map[string]string{
+		"x-goog-meta-user-id":    entity.UserID,
+		"x-goog-meta-project-id": r.ProjectId,
+	}
+
+	if _, err := wc.Write(content); err != nil {
+		r.Logger.Panic(err)
+		return nil, err
+	}
+
+	if err := wc.Close(); err != nil {
+		r.Logger.Panic(err)
+		return nil, err
+	}
+
+	return entity, nil
 }
 
 func (r *DatasetDataRepository) Delete(id string) error {

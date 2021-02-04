@@ -11,6 +11,15 @@ import { ActionTree, GetterTree, Module, MutationTree } from 'vuex';
 import { AppError, createAppError } from '@/infrastructure/core';
 import { AppModelHistory, writeAppModel } from '@/infrastructure/app_model';
 import moment from 'moment';
+import { getAppDI } from '@/di/AppDI';
+import {
+  appDatasetToTensors,
+  appModelToTensorOptions
+} from '@/infrastructure/dataset';
+
+const datasetRepository = () => getAppDI().datasetRepository;
+const tensorNormalizationRepository = () =>
+  getAppDI().tensorNormalizationRepository;
 
 export interface StoreAppModelTrainingState {
   [key: string]: unknown;
@@ -30,7 +39,7 @@ const _defaultState = (): StoreAppModelTrainingState => ({
   isTrainFinished: false,
   appTFModel: null,
   error: null,
-  trainHistory: null,
+  trainHistory: null
 });
 
 export enum EnumStoreAppModelTrainingGetters {
@@ -39,7 +48,7 @@ export enum EnumStoreAppModelTrainingGetters {
   appModel = 'APP_MODEL',
   appTFModel = 'APP_TF_MODEL',
   isTrainFinished = 'IS_TRAIN_FINISHED',
-  trainHistory = 'TRAIN_HISTORY',
+  trainHistory = 'TRAIN_HISTORY'
 }
 
 export enum EnumStoreAppModelTrainingMutations {
@@ -48,7 +57,7 @@ export enum EnumStoreAppModelTrainingMutations {
 
 export enum EnumStoreAppModelTrainingActions {
   setModel = 'SET_MODEL',
-  createTFModel = 'CREATE_TF_MODEL',
+  createTFModel = 'CREATE_TF_MODEL'
 }
 
 const _getters = EnumStoreAppModelTrainingGetters;
@@ -72,7 +81,10 @@ export const mutations: MutationTree<StoreAppModelTrainingState> = {
   }
 };
 
-const _commit = <T>(commit: Commit, newState: Partial<StoreAppModelTrainingState>) => (obj: T) => {
+const _commit = <T>(
+  commit: Commit,
+  newState: Partial<StoreAppModelTrainingState>
+) => (obj: T) => {
   commit(_mutations.update, newState);
   return obj;
 };
@@ -85,18 +97,22 @@ export const actions: ActionTree<StoreAppModelTrainingState, AppState> = {
       E.fromNullable(createAppError({ message: 'Model id is null' })),
       E.chain(AM.readAppModel),
       E.fold(
-        (error) => {
+        error => {
           _commit(commit, {
             error: error
           })(null);
           NS.toastError(error);
         },
-        (model) =>
+        model =>
           F.pipe(
             model,
             _commit(commit, {
-              appModel: model,
+              appModel: model
             }),
+            x => {
+              console.log(x);
+              return x;
+            },
             AM.readAppModelHistory,
             E.map(x => {
               _commit(commit, {
@@ -110,29 +126,26 @@ export const actions: ActionTree<StoreAppModelTrainingState, AppState> = {
   [_actions.createTFModel]: async ({ commit, state, getters }) => {
     const trainCallback: AM.AppTFTrainProcessLogCallback = {
       onEpochEnd: (epoch, log) => {
-        let existsHistory;
-        if (getters[_getters.trainHistory]) {
-          existsHistory = {
-            ...getters[_getters.trainHistory]
-          };
-        } else {
-          existsHistory = {
-            startedTime: moment().unix(),
-            epoch: [],
-            loss: [],
-            valLoss: []
-          } as AppModelHistory;
-        }
+        const existsHistory = (getters[
+          _getters.trainHistory
+        ] as AppModelHistory)
+          ? {
+              ...(getters[_getters.trainHistory] as AppModelHistory),
+              losses: {
+                ...(getters[_getters.trainHistory] as AppModelHistory).losses
+              }
+            }
+          : {
+              epoch: [],
+              startedTime: moment().unix(),
+              losses: {}
+            };
 
-        existsHistory.epoch = [...existsHistory.epoch ?? [], epoch];
-        existsHistory.loss = [...existsHistory.loss ?? [], log['loss']];
-        if (existsHistory.valLoss) {
-          existsHistory.valLoss = [
-            ...existsHistory.valLoss,
-            log['val_loss']
-          ];
-        } else {
-          existsHistory.valLoss = [log['val_loss']];
+        existsHistory.epoch = [...(existsHistory.epoch ?? []), epoch];
+        for (const key in log) {
+          existsHistory.losses[key] = existsHistory.losses[key]
+            ? [...existsHistory.losses[key], log[key]]
+            : [log[key]];
         }
 
         _commit(commit, {
@@ -144,11 +157,27 @@ export const actions: ActionTree<StoreAppModelTrainingState, AppState> = {
           F.pipe(
             {
               ...getters[_getters.trainHistory],
-              finishedTime: moment().unix(),
+              finishedTime: moment().unix()
             } as AM.AppModelHistory,
             AM.writeAppModelHistory(getters[_getters.appModel]),
             E.mapLeft(NS.toastError)
           );
+
+          const mh = getters[_getters.trainHistory] as AM.AppModelHistory;
+          if (mh && Object.keys(mh.losses).length) {
+            F.pipe(
+              {
+                ...(getters[_getters.appModel] as AM.AppModel),
+                trained: true,
+                updatedTime: moment().unix(),
+                finalResult: {
+                  ...mh.losses
+                }
+              },
+              AM.writeAppModel,
+              E.mapLeft(NS.toastError)
+            );
+          }
         }
 
         _commit(commit, {
@@ -157,94 +186,126 @@ export const actions: ActionTree<StoreAppModelTrainingState, AppState> = {
       }
     };
 
-    await F.pipe(
+    if (state.trainHistory) {
+      _commit(commit, {
+        trainHistory: null,
+        isTrainFinished: false
+      })(null);
+    }
+
+    return F.pipe(
       state?.appModel?.datasetId,
       _commit(commit, {
         isInProgress: true
       }),
       E.fromNullable(createAppError({ message: 'No dataset id found' })),
-      E.chain(DATASET.readMetadataById),
-      E.chain(DATASET.readDataset),
-      E.chain(dataset => F.pipe(
-        state.appModel,
-        E.fromNullable(createAppError({ message: 'IMPOSSIBLE' })),
-        E.map(model => ({
-          dataset,
-          model
-        }))
-      )),
-      E.chain(trainingPayload =>
+      TE.fromEither,
+      TE.chain(
+        F.flow(
+          id => ({
+            ID: id,
+            limit: 100000,
+            skip: 0
+          }),
+          datasetRepository().Read
+        )
+      ),
+      TE.map(dataset => ({
+        dataset: dataset,
+        model: state.appModel!
+      })),
+      TE.chain(payload =>
         F.pipe(
-          trainingPayload.model,
+          payload.model!,
           AM.createAppTFModelFromModel,
-          E.map(tf => ({
-            ...trainingPayload,
-            tf: tf
+          TE.fromEither,
+          TE.map(x => ({
+            ...payload,
+            tf: x
           }))
         )
       ),
-      TE.fromEither,
-      TE.chain(x => // train model
+      TE.chain(payload =>
         F.pipe(
-          x.tf,
-          AM.trainAppTFModel({ ...x, logCallback: trainCallback }),
-          TE.map(
-            hist => ({
-              ...x,
-              hist: hist
-            })
+          payload.dataset,
+          appDatasetToTensors(appModelToTensorOptions(payload.model, true)),
+          TE.fromEither,
+          TE.chain(tensors =>
+            F.pipe(
+              tensorNormalizationRepository().write(payload.model.id, tensors),
+              TE.map(_ => ({
+                ...payload,
+                tensors: tensors
+              }))
+            )
           )
-        ),
-      ),
-      TE.chain(data =>
-        F.pipe(
-          data.tf,
-          AM.writeTFModel(data.model),
-          TE.map(_ => data)
         )
       ),
-      _commit(commit, {
-        isInProgress: false,
-      }),
+      TE.chain(payload =>
+        F.pipe(
+          payload.tf,
+          AM.trainAppTFModel({ ...payload, logCallback: trainCallback }),
+          TE.map(hist => ({
+            ...payload,
+            hist: hist
+          }))
+        )
+      ),
+      TE.chain(payload =>
+        F.pipe(
+          payload.tf,
+          AM.writeTFModel(payload.model),
+          TE.map(_ => payload)
+        )
+      ),
+      TE.chain(result =>
+        F.pipe(
+          {
+            ...result,
+            model: {
+              ...result.model,
+              trained: true,
+              updatedTime: moment().unix()
+            }
+          },
+          E.of,
+          E.chain(d =>
+            F.pipe(
+              d.model,
+              writeAppModel,
+              E.map(_ => d)
+            )
+          ),
+          TE.fromEither
+        )
+      ),
       TE.fold(
-        (err) => {
+        err => {
           NS.toastError(err);
-          return T.never;
+          _commit(commit, {
+            isInProgress: false
+          })(null);
+          return TE.left(err);
         },
-        (res) =>
-          F.pipe(
-            res,
-            data => ({
-              ...data,
-              model: {
-                ...data.model,
-                trained: true,
-                updatedTime: moment().unix(),
-              }
-            }),
-            E.of,
-            E.chain(d =>
-              F.pipe(
-                d,
-                d => d.model,
-                writeAppModel,
-                E.map(_ => d)
-              )
-            ),
-            E.map(d => _commit(commit, {
-              error: undefined,
-              isTrainFinished: true,
-              appTFModel: d.tf,
-              appModel: d.model
-            })(d)),
-            _ => T.never
-          )
+        response => {
+          _commit(commit, {
+            error: undefined,
+            isTrainFinished: true,
+            isInProgress: false,
+            appTFModel: response.tf,
+            appModel: response.model
+          })(null);
+          return TE.right(response);
+        }
       )
     )();
   }
 };
 
-export const storeAppModelTrainingModule: Module<StoreAppModelTrainingState, AppState> = {
+export const storeAppModelTrainingModule: Module<
+  StoreAppModelTrainingState,
+  AppState
+> = {
   namespaced: true,
   state: _defaultState,
   getters,

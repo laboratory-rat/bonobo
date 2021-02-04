@@ -1,7 +1,5 @@
 <template>
   <div v-if="data && model">
-    {{model.selected}}
-
     <q-table
       :columns="tableColumns"
       :data="model.header"
@@ -33,7 +31,7 @@
               emit-value
               map-options
               dense
-              @input="emitModelUpdate"
+              @input="onDatasetTypeChange"
             />
           </div>
         </div>
@@ -117,7 +115,7 @@ import {
   AppDatasetApproveHeader,
   AppDatasetMetadata,
   enumAppDatasetTypeList,
-  enumAppDatasetColTypeList
+  enumAppDatasetColTypeList, EnumAppDatasetMetadataProcessType
 } from '@/infrastructure/dataset';
 import { AppDatasetApproveSelected } from '@/views/dataset/children/upload/store';
 
@@ -209,6 +207,15 @@ export default class SchemeUpdateComponent extends Vue {
 
   mounted() {
     this._watchOnApproveModel(this.approveModel);
+  }
+
+  onDatasetTypeChange(type: EnumAppDatasetMetadataProcessType) {
+    if (!this.model) {
+      return;
+    }
+
+    this.model.datasetProcessType = type;
+    this.emitModelUpdate();
   }
 }
 </script>

@@ -32,12 +32,18 @@
       <div class="col-12">
         <q-input
           dense
+          :disable='isAutoName'
           label="Model name *"
           filled
           debounce="300"
           @input="emitUpdate()"
           v-model="model.name"
-        />
+        >
+          <template v-slot:after>
+            <q-btn round dense flat :icon="isAutoName ? 'title' : 'format_clear'" @click='onAutoNameClick' />
+          </template>
+        </q-input>
+
       </div>
       <div class="col-6">
         <q-input
@@ -63,6 +69,7 @@
         <option-sequential-simple
           v-if="selectedModelSubtype == enumAppModelSubtype.simple"
           v-model="model.options"
+          @on:update='emitUpdate'
         />
         <option-sequential-lstm
           v-else-if="selectedModelSubtype == enumAppModelSubtype.lstm"
@@ -80,7 +87,8 @@ import {
   EnumAppModelSubtype,
   EnumAppModelSubtypesList,
   EnumAppModelType,
-  EnumAppModelTypesList
+  EnumAppModelTypesList,
+  createAppTFModelName
 } from '@/infrastructure/app_model';
 import { appModelOptionsSelect } from '@/infrastructure/app_model/options/AppModelOptions';
 import { KeyLabelStringIterable } from '@/infrastructure/core';
@@ -100,8 +108,20 @@ export default class AppModelCreateComponent extends Vue {
   @PropSync('metadata')
   syncMetadata!: AppDatasetMetadata;
 
+  @PropSync('syncModel')
+  sModel!: AppModel | null;
+
+  @Watch('sModel')
+  _watchSyncModel(m: AppModel | null) {
+    if (m != null && m != this.model) {
+      this.model = JSON.parse(JSON.stringify(m));
+      this.emitUpdate();
+    }
+  }
+
   model: AppModel | null = null;
 
+  isAutoName = true;
   selectedModelType: EnumAppModelType = EnumAppModelType.sequential;
   selectedModelSubtype: EnumAppModelSubtype = EnumAppModelSubtype.simple;
 
@@ -128,11 +148,15 @@ export default class AppModelCreateComponent extends Vue {
 
   @Emit('update')
   emitUpdate() {
+    if (this.isAutoName && this.model) {
+      this.model.name = createAppTFModelName(this.model);
+    }
     return this.model;
   }
 
   mounted() {
     this.onAlgorithmChanged();
+    this._watchSyncModel(this.sModel);
   }
 
   onAlgorithmChanged() {
@@ -148,6 +172,13 @@ export default class AppModelCreateComponent extends Vue {
       })
     });
     this.emitUpdate();
+  }
+
+  onAutoNameClick() {
+    this.isAutoName = !this.isAutoName;
+    if (this.isAutoName) {
+      this.emitUpdate();
+    }
   }
 }
 </script>

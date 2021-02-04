@@ -54,13 +54,13 @@ export interface AppModelPredictionResult extends AppModelPredictionMetadata {
   outputLabels: string[];
 
   /** Input data 2D array */
-  inputData: [][];
+  inputData: number[][];
 
   /** Output data 2D array */
-  outputData: [][];
+  outputData: number[][];
 
   /** Correct data 2D array (only for validation) */
-  correctData: [][];
+  correctData: number[][];
 }
 
 /**

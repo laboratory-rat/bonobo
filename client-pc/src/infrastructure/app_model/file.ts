@@ -287,7 +287,7 @@ export const writeAppModelPredictionMetadata = (payload: AppModelPredictionMetad
       const _pathResult = modelResultsFile(payload);
       [_path, _pathResult].forEach(path => {
         if (fs.existsSync(path)) {
-          fs.readFileSync(path);
+          fs.rmdirSync(path);
         }
       });
 

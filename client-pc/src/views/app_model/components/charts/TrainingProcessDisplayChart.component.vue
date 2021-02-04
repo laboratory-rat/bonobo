@@ -18,10 +18,11 @@
       </div>
     </q-toolbar>
     <q-separator class="q-my-sm" />
-    <div>
+    <div class='chart'>
       <apexcharts
         v-if="!!syncHistory"
         type="line"
+        height='100%'
         :options="trainChartOptions"
         :series="trainChartSeries"
       />
@@ -67,28 +68,41 @@ export default class TrainingProcessDisplayChartComponent extends Vue {
         categories: !this.syncHistory
           ? []
           : this.syncHistory.epoch.map(x => x + 1)
+      },
+      yaxis: {
+        min: 0,
       }
     };
   }
 
   get trainChartSeries() {
-    return this.syncHistory == null
-      ? []
-      : [
-          {
-            name:
-              'validation loss' +
-              (this.selectedLossSensitive.key == '0'
-                ? ''
-                : ` 10^(-${this.selectedLossSensitive.key})`),
-            data: this.syncHistory.loss.map(x =>
-              this.selectedLossSensitive.func(x)
-            )
-          }
-        ];
+    const series: unknown[] = [];
+    if (!this.syncHistory) {
+      return series;
+    }
+
+    for (const key in this.syncHistory.losses) {
+      const value = this.syncHistory.losses[key];
+      series.push({
+        name:
+          key +
+          (this.selectedLossSensitive.key == '0'
+            ? ''
+            : ` 10^(-${this.selectedLossSensitive.key})`),
+        data: value.map(this.selectedLossSensitive.func),
+      });
+    }
+
+    return series;
   }
 
   lossSensitiveOptions: LossSensitiveOption[] = _lossSensitive;
   selectedLossSensitive: LossSensitiveOption = _lossSensitive[0];
 }
 </script>
+
+<style scoped lang='scss'>
+.chart {
+  height: 60vh;
+}
+</style>

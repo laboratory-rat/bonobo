@@ -2,7 +2,7 @@
   <q-dialog ref="dialog" no-backdrop-dismiss @hide="onDialogHide">
     <q-card class="q-dialog-plugin root-card">
       <q-card-section>
-        <app-model-create-component :metadata="metadata" @update="onUpdate" />
+        <app-model-create-component :sync-model='baseModel' :metadata="metadata" @update="onUpdate" />
       </q-card-section>
       <q-card-actions align="between">
         <q-btn flat @click="onCancelClick">Cancel</q-btn>
@@ -33,6 +33,9 @@ export default class AppModelCreateDialog extends QDialog {
 
   @Prop()
   metadata!: AppDatasetMetadata;
+
+  @Prop()
+  baseModel?: AppModel;
 
   model: AppModel | null = null;
 

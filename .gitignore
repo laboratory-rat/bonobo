@@ -5,5 +5,6 @@
 **/.vscode/
 **/.idea/
 **/secret/
+**/build/
 **/dist_electron/
 **/docker-compose.yml

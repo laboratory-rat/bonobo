@@ -13,6 +13,7 @@
                 outlined
                 v-model="model.id"
                 debounce="50"
+                @input='updateModel'
                 label="Sheet id"
               >
                 <template v-slot:after>

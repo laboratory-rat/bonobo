@@ -1,5 +1,4 @@
 import * as AM from '@/infrastructure/app_model';
-import * as DS from '@/infrastructure/dataset';
 import * as F from 'fp-ts/function';
 import * as E from 'fp-ts/Either';
 import * as T from 'fp-ts/Task';
@@ -8,11 +7,13 @@ import * as ERR from '@/infrastructure/core/Error';
 import * as NS from '@/infrastructure/services/NotifyService';
 import { AppState } from '@/store';
 import { ActionTree, Commit, GetterTree, Module, MutationTree } from 'vuex';
-import { model } from '@tensorflow/tfjs';
+import { getAppDI } from '@/di/AppDI';
+
+const datasetRepository = () => getAppDI().datasetRepository;
 
 export interface StoreAppModelPredictionExploreState {
   [key: string]: unknown;
-  inInProgress: boolean;
+  isInProgress: boolean;
   error: ERR.AppError | null;
   modelId: string | null;
   modelMetadata: AM.AppModel | null;
@@ -24,15 +25,14 @@ export interface StoreAppModelPredictionExploreState {
 
 const _defaultState = (): StoreAppModelPredictionExploreState => ({
   error: null,
-  inInProgress: false,
+  isInProgress: false,
   metadata: null,
   metadataId: null,
   modelMetadata: null,
   tfModel: null,
   modelId: null,
-  result: null,
+  result: null
 });
-
 
 export enum EnumStoreGetters {
   isInProgress = 'IS_IN_PROGRESS',
@@ -55,7 +55,10 @@ const _getters = EnumStoreGetters;
 const _mutations = EnumStoreMutations;
 const _actions = EnumStoreActions;
 
-export const getters: GetterTree<StoreAppModelPredictionExploreState, AppState> = {
+export const getters: GetterTree<
+  StoreAppModelPredictionExploreState,
+  AppState
+> = {
   [_getters.model]: state => state.modelMetadata,
   [_getters.isInProgress]: state => state.inInProgress,
   [_getters.metadata]: state => state.metadata,
@@ -64,29 +67,57 @@ export const getters: GetterTree<StoreAppModelPredictionExploreState, AppState> 
 };
 
 export const mutations: MutationTree<StoreAppModelPredictionExploreState> = {
-  [_mutations.update]: (state, nState: Partial<StoreAppModelPredictionExploreState>) => {
+  [_mutations.update]: (
+    state,
+    nState: Partial<StoreAppModelPredictionExploreState>
+  ) => {
     for (const key in nState) {
       state[key] = nState[key];
     }
   }
 };
 
-const _commit = <T>(commit: Commit, newState: Partial<StoreAppModelPredictionExploreState>) => (obj: T) => {
+const _commit = <T>(
+  commit: Commit,
+  newState: Partial<StoreAppModelPredictionExploreState>
+) => (obj: T) => {
   commit(_mutations.update, newState);
   return obj;
 };
 
-export const actions: ActionTree<StoreAppModelPredictionExploreState, AppState> = {
-  [_actions.init]: ({ commit }, payload: { modelId: string; predictionId: string }): void =>
+/**
+ * Update state and return void.
+ * TODO: Remove all old commit functions. Do I need them now?
+ * @param commit
+ * @param newState
+ */
+const _commitSimple = (
+  commit: Commit,
+  newState: Partial<StoreAppModelPredictionExploreState>
+) => {
+  commit(_mutations.update, newState);
+};
+
+export const actions: ActionTree<
+  StoreAppModelPredictionExploreState,
+  AppState
+> = {
+  [_actions.init]: (
+    { commit },
+    payload: { modelId: string; predictionId: string }
+  ): void =>
     F.pipe(
       payload,
       E.fromNullable(ERR.createAppError({ message: 'Model not selected' })),
       E.chain(payload => {
-        if (!payload.modelId || !payload.modelId.trim().length) return E.left(ERR.createAppError({ message: 'Model ID is null' }));
-        if (!payload.predictionId || !payload.predictionId.trim().length) return E.left(ERR.createAppError({ message: 'Prediction ID is null' }));
+        if (!payload.modelId || !payload.modelId.trim().length)
+          return E.left(ERR.createAppError({ message: 'Model ID is null' }));
+        if (!payload.predictionId || !payload.predictionId.trim().length)
+          return E.left(
+            ERR.createAppError({ message: 'Prediction ID is null' })
+          );
         return E.right(payload);
       }),
-
       E.chain(payload =>
         F.pipe(
           { id: payload.modelId },
@@ -122,47 +153,50 @@ export const actions: ActionTree<StoreAppModelPredictionExploreState, AppState> 
           }))
         )
       ),
-      E.fold(
-        NS.toastError,
-        (result) => {
-          _commit(commit, {
-            error: null,
-            modelId: result.modelId,
-            modelMetadata: result.model,
-            metadata: result.predictionMetadata,
-            metadataId: result.predictionId,
-            result: result.predictionResult,
-            tfModel: null
-          })(null);
-        },
-      )
+      E.fold(NS.toastError, result => {
+        _commit(commit, {
+          error: null,
+          modelId: result.modelId,
+          modelMetadata: result.model,
+          metadata: result.predictionMetadata,
+          metadataId: result.predictionMetadata.id,
+          result: result.predictionResult,
+          tfModel: null
+        })(null);
+      })
     ),
 
-  [_actions.process]: async ({ commit, state }) =>
-    await F.pipe(
+  [_actions.process]: ({ commit, state }) => {
+    return F.pipe(
       state.metadata,
-      E.fromNullable(ERR.createAppError({ message: 'Result metadata is null' })),
-      E.chain(metadata =>
+      E.fromNullable(
+        ERR.createAppError({ message: 'Result metadata is null' })
+      ),
+      TE.fromEither,
+      TE.chain(metadata =>
         F.pipe(
-          { id: metadata.datasetId },
-          DS.readDataset,
-          E.map(dataset => ({
+          datasetRepository().Read({
+            ID: metadata.datasetId,
+            limit: 100000,
+            skip: 0
+          }),
+          TE.map(dataset => ({
             dataset,
-            metadata
+            metadata: metadata
           }))
         )
       ),
-      E.chain(map =>
+      TE.chain(map =>
         F.pipe(
           { id: map.metadata.modelId },
           AM.readAppModel,
           E.map(appModel => ({
             ...map,
             model: appModel
-          }))
+          })),
+          TE.fromEither
         )
       ),
-      TE.fromEither,
       TE.chain(payload =>
         F.pipe(
           AM.readTFModel(payload.model)(),
@@ -172,26 +206,66 @@ export const actions: ActionTree<StoreAppModelPredictionExploreState, AppState> 
           }))
         )
       ),
-      TE.chain(data =>
+      TE.chain(payload =>
         F.pipe(
-          data.tf,
-          AM.validateAppTFModel(data),
+          payload.tf,
+          AM.validateAppTFModel({
+            model: payload.model,
+            dataset: payload.dataset,
+            logCallback: undefined
+          }),
+          TE.map(r => ({
+            model: payload.model,
+            result: {
+              ...r,
+              inputLabels: payload.dataset.header
+                .filter(x => !x.isOutput)
+                .map(x => x.title),
+              outputLabels: payload.dataset.header
+                .filter(x => x.isOutput)
+                .map(x => x.title),
+              datasetName: payload.dataset.name,
+              datasetId: payload.dataset.id
+            }
+          }))
+        )
+      ),
+      TE.chain(result =>
+        F.pipe(
+          AM.writeAppModelPredictionResult({
+            predictionResult: result.result,
+            isValidation: true,
+            modelId: result.model.id
+          }),
+          TE.fromEither,
+          TE.map(_ => result.result)
         )
       ),
       TE.fold(
         err => {
           NS.toastError(err);
+          _commitSimple(commit, {
+            isInProgress: false,
+            error: err
+          });
           return T.never;
         },
-        (res) => {
-          console.log(res);
+        res => {
+          _commitSimple(commit, {
+            result: res,
+            isInProgress: false
+          });
           return T.never;
         }
       )
-    )()
+    )();
+  }
 };
 
-export const storeAppModelPredictionExploreModule: Module<StoreAppModelPredictionExploreState, AppState> = {
+export const storeAppModelPredictionExploreModule: Module<
+  StoreAppModelPredictionExploreState,
+  AppState
+> = {
   namespaced: true,
   state: _defaultState,
   getters,

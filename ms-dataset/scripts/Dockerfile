@@ -7,9 +7,9 @@ RUN apk update
 
 WORKDIR /app
 
-COPY . .
+COPY .. .
 RUN go mod download
-
+RUN go mod vendor
 RUN go build -o ./app ./main.go
 
 EXPOSE $BNB_PORT

@@ -21,8 +21,8 @@
         >
           <template v-slot:body-cell-actions="props">
             <q-td class="flex justify-end">
-              <q-btn icon="edit" flat @click="onEditClick(props.row)">
-              </q-btn>
+              <q-btn icon='delete' flat @click='onDeleteClick(props.row)' />
+              <q-btn icon="edit" flat @click="onEditClick(props.row)" />
             </q-td>
           </template>
         </q-table>
@@ -123,8 +123,8 @@ export default class AppModelPredictionListView extends Vue {
   tableColumns = predictionStatusesColumns;
   pagination = pagination;
 
-  onCreateClick() {
-    this._actionRefreshAvailableDatasets();
+  async onCreateClick() {
+    await this._actionRefreshAvailableDatasets();
     this.$q
       .dialog({
         parent: this,
@@ -143,6 +143,10 @@ export default class AppModelPredictionListView extends Vue {
           });
         }
       });
+  }
+
+  onDeleteClick(rowIndex: number) {
+    return null;
   }
 
   onEditClick($event: AppPredictionStatus) {

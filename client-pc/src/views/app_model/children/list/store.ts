@@ -56,6 +56,7 @@ const actions: ActionTree<StoreAppModelListState, AppState> = {
     F.pipe(
       null,
       AP.scanAppModels,
+      E.map(x => x.sort((a, b) => b.updatedTime - a.updatedTime)),
       E.fold(
         (error) => NS.toastError(error),
         (list) => _commit(commit, { list })(null)

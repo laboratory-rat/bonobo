@@ -2,12 +2,15 @@ import { DatasetRepository } from '@/infrastructure/repository/interface/Dataset
 import { createDatasetMSRepository } from '@/infrastructure/repository/instance/DatasetMSRepository';
 import * as yaml from 'js-yaml';
 import * as fs from 'fs';
+import { TensorNormalizationRepository } from '@/infrastructure/repository/interface/TensorNormalizationRepository';
+import { createTensorNormalizationHDRepository } from '@/infrastructure/repository/instance/TensorNormalizationHDRepository';
 
 /**
  * All injected interfaces
  */
 export interface AppDI {
   datasetRepository: DatasetRepository;
+  tensorNormalizationRepository: TensorNormalizationRepository;
 }
 
 /**
@@ -29,7 +32,8 @@ function _readAppDIConfig(path: string): AppDIConfig {
 
 function _createAppDI(config: AppDIConfig): AppDI {
   return {
-    datasetRepository: createDatasetMSRepository({host: config.datasetService.host})
+    datasetRepository: createDatasetMSRepository({host: config.datasetService.host}),
+    tensorNormalizationRepository: createTensorNormalizationHDRepository()
   };
 }
 
