@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2016",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "./",
+    "paths": {
+      "@lib/*": ["lib/*"],
+      "@test/*": ["test/*"]
+    },
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "./scripts"
+  ],
+  "include": [
+    "./lib",
+    "./test"
+  ]
+}
