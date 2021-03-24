@@ -4,7 +4,7 @@
   "description": "",
   "author": "oleg.timofeev20@gmail.com",
   "license": "ISC",
-  "module": "es2015",
+  "module": "commonjs",
   "scripts": {
     "pack:all": "node scripts/pack_all.js",
     "test": "mocha --require ts-node/register ./test/**/*.ts",
@@ -16,10 +16,13 @@
     "@tensorflow/tfjs-node": "^3.3.0",
     "@tensorflow/tfjs-node-gpu": "^3.3.0",
     "fp-ts": "^2.9.5",
-    "moment": "^2.29.1"
+    "lodash": "^4.17.21",
+    "moment": "^2.29.1",
+    "yaml": "^1.10.2"
   },
   "devDependencies": {
     "@types/expect": "^24.3.0",
+    "@types/lodash": "^4.14.168",
     "@types/mocha": "^8.2.1",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",

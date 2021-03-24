@@ -1,4 +1,4 @@
-import { Model } from '@lib/model/index';
+import { Model } from './model';
 
 export const __ = (key: string, value: unknown): unknown =>
     key && key.trim().length && !key.startsWith('_') ? value : undefined;

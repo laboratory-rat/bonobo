@@ -5,7 +5,12 @@
     "target": "es2016",
     "sourceMap": true,
     "strict": true,
+    "lib": ["es2017"],
+    "noImplicitAny": false,
+    "declaration": false,
     "esModuleInterop": true,
+    "removeComments": true,
+    "inlineSourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": "./",
     "paths": {
@@ -14,11 +19,14 @@
     },
     "skipLibCheck": true
   },
+  "ts-node": {
+    "transpileOnly": true
+  },
   "exclude": [
     "./scripts"
   ],
   "include": [
-    "./lib",
-    "./test"
+    "./lib/**/*.ts",
+    "./test/**/*.ts"
   ]
 }
