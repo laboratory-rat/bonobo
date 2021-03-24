@@ -2,13 +2,15 @@ import { ErrorTypeNode } from '@lib/model/node';
 import { ErrorTypeModel } from '@lib/model/model';
 import { ErrorTypeUnit } from '@lib/model/unit';
 import { ErrorTypeActivation } from '@lib/model/activation';
+import { ErrorTypeOptimizer } from '@lib/model/optimizer';
 
 export type ErrorType =
     | ErrorTypeModel
     | ErrorTypeTensor
     | ErrorTypeNode
     | ErrorTypeUnit
-    | ErrorTypeActivation;
+    | ErrorTypeActivation
+    | ErrorTypeOptimizer;
 
 export type ErrorTypeTensor =
     | 'TENSOR_TO_ARRAY_ERROR'

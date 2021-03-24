@@ -12,7 +12,7 @@ import {
 import { createError, ERR } from '../error';
 import {
     Activation,
-    applyActivationToLayer,
+    compileActivation,
     validateActivation,
 } from './activation';
 import { pipe } from 'fp-ts/function';
@@ -116,8 +116,9 @@ export interface UnitOptionsTransform extends BaseUnitOptions {
 
 export interface UnitOptionsOutput extends BaseUnitOptions {
     type: '_output';
-    shape: (null | number)[];
     units: number;
+    shape: (null | number)[];
+    activation?: Activation;
 }
 
 export const createUnit = (payload: {
@@ -358,51 +359,36 @@ export const validateUnit = (unit: ModelUnit): Either<ERR, ModelUnit> =>
         })
     );
 
-export const compileUnit = (
-    unit: ModelUnit
-): Either<ERR, LayerChainType | TF.layers.Layer> =>
+export const compileUnit = (unit: ModelUnit, parent?: any): Either<ERR, any> =>
     pipe(
-        unit,
-        fromNullable(createError('UNIT_COMPILE_ERROR', 'Unit is null')),
-        chain(validateUnit),
+        validateUnit(unit),
         chain((unit) => {
+            let result;
             switch (unit.type) {
                 case '_input':
-                    return right(
-                        TF.layers.inputLayer({
-                            inputShape: unit.options.shape,
-                        })
-                    );
-                case '_sequential':
-                    return pipe(
-                        of<ERR, TF.layers.Layer>(
-                            TF.layers.dense({
-                                units: unit.options.units,
-                            })
-                        ),
-                        chain((layer) =>
-                            unit.options.activation
-                                ? applyActivationToLayer(
-                                      layer,
-                                      unit.options.activation
-                                  )
-                                : right(layer)
-                        )
-                    );
+                    result = TF.layers.inputLayer({
+                        inputShape: unit.options.shape,
+                    });
+                    break;
                 case '_output':
-                    return right(
-                        TF.layers.dense({
+                case '_sequential':
+                    result = TF.layers
+                        .dense({
                             units: unit.options.units,
                         })
-                    );
+                        .apply(parent);
+                    if (unit.options.activation) {
+                        result = compileActivation(
+                            unit.options.activation,
+                            result
+                        );
+                    }
+                    break;
                 case '_transform':
                 case '_recurrent':
-                    return left(
-                        createError(
-                            'UNIT_COMPILE_ERROR',
-                            'Recurrent and transform units are not implemented'
-                        )
-                    );
+                    return createError('UNIT_COMPILE_ERROR', 'Not implemented');
             }
+
+            return result;
         })
     );

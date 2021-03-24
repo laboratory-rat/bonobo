@@ -43,9 +43,8 @@ const _createModel = () =>
                                         createUnit({
                                             type: '_sequential',
                                             options: {
-                                                type: '_sequential',
-                                                activation: null,
                                                 shape: [null, 100],
+                                                type: '_input',
                                             },
                                         }),
                                         chain(applyUnitToModel(model)),
@@ -67,6 +66,7 @@ const _createModel = () =>
                                                                     null,
                                                                     12,
                                                                 ],
+                                                                units: 5,
                                                                 activation: {
                                                                     type:
                                                                         'relu',
@@ -107,6 +107,7 @@ const _createModel = () =>
                                                                                             null,
                                                                                             12,
                                                                                         ],
+                                                                                        units: 10,
                                                                                         activation: {
                                                                                             type:
                                                                                                 'relu',
@@ -153,6 +154,11 @@ const _createModel = () =>
                                                                                                                     null,
                                                                                                                     1,
                                                                                                                 ],
+                                                                                                                units: 1,
+                                                                                                                activation: {
+                                                                                                                    type:
+                                                                                                                        'relu',
+                                                                                                                },
                                                                                                             },
                                                                                                         }
                                                                                                     ),

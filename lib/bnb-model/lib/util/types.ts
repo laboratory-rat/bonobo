@@ -1,7 +1,5 @@
-import { TF } from '../connector';
+import { TF } from '@lib/connector';
 
-export type LayerChainType =
-    | TF.Tensor
-    | TF.Tensor[]
-    | TF.SymbolicTensor
-    | TF.SymbolicTensor[];
+export type LayerChainType = TF.SymbolicTensor | TF.layers.Layer;
+
+export type LayerChainTypeApplicable = TF.SymbolicTensor | TF.SymbolicTensor[];

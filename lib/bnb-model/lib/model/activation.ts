@@ -4,6 +4,7 @@ import {
     Either,
     fromNullable,
     left,
+    map,
     of,
     right,
     tryCatch,
@@ -141,8 +142,9 @@ export const validateActivation = (
     );
 
 export const compileActivation = (
-    activation: Activation
-): Either<ERR, TF.layers.Layer> =>
+    activation: Activation,
+    parent: any
+): Either<ERR, any> =>
     pipe(
         activation,
         of,
@@ -198,21 +200,6 @@ export const compileActivation = (
                 },
                 (r) => _createError('ACTIVATION_COMPILE_ERROR', r)
             )
-        )
+        ),
+        map((activation) => activation.apply(parent))
     );
-
-export const applyActivationToLayer = (
-    layer: LayerChainType | TF.layers.Layer,
-    activation?: Activation
-): Either<ERR, LayerChainType | TF.layers.Layer> =>
-    !activation
-        ? of(layer)
-        : pipe(
-              compileActivation(activation),
-              chain((activation) =>
-                  tryCatch(
-                      () => activation.apply(layer as LayerChainType),
-                      (r) => _createError('ACTIVATION_APPLY_ERROR', r)
-                  )
-              )
-          );

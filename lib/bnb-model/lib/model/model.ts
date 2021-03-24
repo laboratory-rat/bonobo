@@ -5,6 +5,10 @@ import {
     ModelNode,
     serializePrepareNode,
     validateNode,
+    flatNodeThree,
+    compileNode,
+    StructureNode,
+    ReferenceNode,
 } from './node';
 import {
     parsePrepareUnit,
@@ -18,23 +22,35 @@ import { pipe } from 'fp-ts/function';
 import {
     chain,
     Either,
+    fold,
     fromNullable,
     isLeft,
+    Left,
     left,
     map,
     mapLeft,
+    of,
     right,
     tryCatch,
 } from 'fp-ts/Either';
 import { createError, ERR } from '../error';
 import { head, filter } from 'lodash';
 import YAML from 'yaml';
+// import { TF } from '@lib/connector';
+import * as TF from '@tensorflow/tfjs';
+import {
+    compileOptimizer,
+    createOptimizer,
+    Optimizer,
+    validateOptimizer,
+} from '@lib/model/optimizer';
 
 export interface Model {
     id: string;
     name: string;
     root: ModelNode;
     units: ModelUnit[];
+    optimizer: Optimizer;
     trainResults?: TrainResults;
     createdAt: number;
     updatedAt: number;
@@ -53,6 +69,7 @@ export type ErrorTypeModel =
     | 'MODEL_PARSE_ERROR'
     | 'MODEL_CLONE_ERROR'
     | 'MODEL_VALIDATION_ERROR'
+    | 'MODEL_COMPILE_ERROR'
     | 'MODEL_SPLIT_TO_LAYERS_ERROR';
 
 const _createError = (
@@ -60,6 +77,27 @@ const _createError = (
     message: unknown,
     innerError?: ERR
 ) => createError(type, message, innerError);
+
+interface NodeShakeState {
+    dependsToId: string | null;
+    joinWithId: string[];
+    node: ModelNode;
+    compiled?: any;
+}
+
+const isNodeShakeStateReady = (
+    map: Map<string, NodeShakeState>,
+    nss: NodeShakeState
+): boolean => {
+    if (nss.dependsToId && !map.get(nss.dependsToId)!.compiled) return false;
+    if (
+        nss.joinWithId &&
+        nss.joinWithId.length &&
+        nss.joinWithId.some((j) => !map.get(j)!.compiled)
+    )
+        return false;
+    return true;
+};
 
 export const createEmptyModel = (p?: {
     name?: string;
@@ -78,6 +116,7 @@ export const createEmptyModel = (p?: {
                 updatedAt: moment().unix(),
                 root,
                 units: [],
+                optimizer: createOptimizer('_sgd'),
             })
         )
     );
@@ -180,6 +219,60 @@ const _validateRoot = (model: Model): Either<ERR, Model> =>
         map((_) => model)
     );
 
+const _validateOptimizer = (model: Model): Either<ERR, Model> =>
+    pipe(
+        validateOptimizer(model.optimizer),
+        map((_) => model)
+    );
+
+const _validateNode = (node: ModelNode[]): Either<ERR, ModelNode[]> =>
+    pipe(
+        of<ERR, ModelNode[]>(node),
+        chain((n) => {
+            const rootsCount = filter(n, { type: '_root' }).length;
+            if (rootsCount == 0)
+                return left(
+                    createError(
+                        'MODEL_VALIDATION_ERROR',
+                        'Root node is required'
+                    )
+                );
+            if (rootsCount > 1)
+                return left(
+                    createError(
+                        'MODEL_VALIDATION_ERROR',
+                        'Root nodes can not be > 1'
+                    )
+                );
+            return right(n);
+        }),
+        chain((n) => {
+            const structCount = filter(n, { type: '_struct' }).length;
+            if (!structCount)
+                return left(
+                    createError(
+                        'MODEL_VALIDATION_ERROR',
+                        'No struct nodes found'
+                    )
+                );
+            return right(n);
+        }),
+        chain((n) => {
+            const innerValidation = head(
+                filter(n.map(validateNode), (x) => x._tag == 'Left')
+            );
+            return innerValidation
+                ? left(
+                      createError(
+                          'MODEL_VALIDATION_ERROR',
+                          'In node error',
+                          (innerValidation as Left<ERR>).left
+                      )
+                  )
+                : right(n);
+        })
+    );
+
 export const validateModel = (model: Model): Either<ERR, Model> =>
     pipe(
         model,
@@ -187,6 +280,13 @@ export const validateModel = (model: Model): Either<ERR, Model> =>
         chain(_validateId),
         chain(_validateName),
         chain(_validateRoot),
+        chain(_validateOptimizer),
+        chain((model) =>
+            pipe(
+                _validateNode(flatNodeThree(model.root)),
+                map((_) => model)
+            )
+        ),
         chain((model) =>
             pipe(
                 model.units,
@@ -259,4 +359,126 @@ export const splitToLayers = (model: Model): Either<ERR, ModelNode[][]> =>
 
             return right(arr);
         })
+    );
+
+export const compileModel = (model: Model): Either<ERR, TF.LayersModel> =>
+    pipe(
+        validateModel(model),
+        chain((model) => {
+            const _l = (message: unknown, inner?: ERR) =>
+                left(_createError('MODEL_COMPILE_ERROR', message, inner));
+
+            const nodesList = flatNodeThree(model.root).slice(1);
+
+            // create apply three
+            const nodeIdToNodeMap = new Map(
+                nodesList.map((node) => [node.id, node])
+            );
+
+            // set all struct nodes
+            const nodesShakeList = new Map(
+                filter(nodesList, { type: '_struct' })
+                    .map((x) => x as StructureNode)
+                    .map((node) => [
+                        node.id,
+                        {
+                            dependsToId:
+                                node._unit!.type == '_input'
+                                    ? null
+                                    : node._parent!.id,
+                            joinWithId: [],
+                            node: node,
+                        } as NodeShakeState,
+                    ])
+            );
+
+            // add references
+            filter(nodesList, { type: '_reference' })
+                .map((x) => x as ReferenceNode)
+                .forEach((node) => {
+                    nodesShakeList
+                        .get(node.nodeId)!
+                        .joinWithId.push(node._parent!.id);
+                });
+
+            // shake until all will be ok
+            let lastStepCompiledCount = 0;
+            while (lastStepCompiledCount != nodesShakeList.size) {
+                [...nodesShakeList.values()]
+                    .filter(
+                        (x) =>
+                            !x.compiled &&
+                            isNodeShakeStateReady(nodesShakeList, x)
+                    )
+                    .forEach((readyNode) => {
+                        readyNode.compiled = compileNode(
+                            readyNode.node,
+                            readyNode.dependsToId
+                                ? nodesShakeList.get(readyNode.dependsToId)!
+                                      .compiled
+                                : undefined
+                        );
+                        if (readyNode.joinWithId.length) {
+                            readyNode.compiled = TF.layers
+                                .concatenate()
+                                .apply([
+                                    readyNode.compiled,
+                                    ...readyNode.joinWithId.map(
+                                        (id) => nodesShakeList.get(id)!.compiled
+                                    ),
+                                ]);
+                        }
+                    });
+
+                const currentStepCompiledCount = [
+                    ...nodesShakeList.values(),
+                ].filter((x) => x.compiled).length;
+                if (currentStepCompiledCount == lastStepCompiledCount) {
+                    return _l('Model can not resolve nodes three');
+                }
+
+                lastStepCompiledCount = currentStepCompiledCount;
+            }
+
+            return right(
+                TF.model({
+                    inputs: [
+                        ...nodesList
+                            .filter(
+                                (x) =>
+                                    x.type == '_struct' &&
+                                    x._unit!.type == '_input'
+                            )
+                            .map((x) => nodesShakeList.get(x.id)!.compiled),
+                    ],
+                    outputs: [
+                        ...nodesList
+                            .filter(
+                                (x) =>
+                                    x.type == '_struct' &&
+                                    x._unit!.type == '_output'
+                            )
+                            .map((x) => nodesShakeList.get(x.id)!.compiled),
+                    ],
+                })
+            );
+        }),
+        chain((tfModel) =>
+            pipe(
+                compileOptimizer(model.optimizer),
+                chain((optimizer) =>
+                    tryCatch(
+                        () => {
+                            tfModel.compile({
+                                optimizer,
+                                loss: ['mse', 'valmse'],
+                            });
+
+                            return tfModel;
+                        },
+                        (reason) => _createError('MODEL_COMPILE_ERROR', reason)
+                    )
+                )
+            )
+        )
     );

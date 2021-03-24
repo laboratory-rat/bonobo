@@ -1,4 +1,4 @@
-import { ModelUnit, validateUnit } from './unit';
+import { compileUnit, ModelUnit } from './unit';
 import { generateRandomId, generateRandomName } from '../util/util';
 import { filter, head, remove } from 'lodash';
 import {
@@ -7,7 +7,6 @@ import {
     fold,
     fromNullable,
     isLeft,
-    Left,
     map,
     of,
     right,
@@ -15,8 +14,6 @@ import {
 import { ERR } from '../error';
 import { pipe } from 'fp-ts/function';
 import { left } from 'fp-ts/Either';
-import { LayerChainType } from '@lib/util/types';
-import { TF } from '../connector';
 
 export type ModelNode = RootNode | StructureNode | ReferenceNode;
 
@@ -31,6 +28,7 @@ export type ErrorTypeNode =
     | 'NODE_VALIDATION_ERROR'
     | 'NODE_APPLY_ERROR'
     | 'NODE_APPLY_NODE_ERROR'
+    | 'NODE_COMPILE_ERROR'
     | 'NODE_UNDEFINED_ERROR';
 
 const _createError = (
@@ -613,6 +611,26 @@ export const validateNode = (node: ModelNode): Either<ERR, ModelNode> =>
         )
     );
 
-export const compileUnit = (
-    unit: ModelUnit
-): Either<ERR, LayerChainType | TF.layers.Layer> => pipe();
+export const compileNode = (node: ModelNode, parent: any): Either<ERR, any> =>
+    pipe(
+        validateNode(node),
+        chain((node) => {
+            switch (node.type) {
+                case '_struct':
+                    return pipe(
+                        node._unit,
+                        fromNullable(
+                            _createError('NODE_COMPILE_ERROR', 'Unit is null')
+                        ),
+                        chain((unit) => compileUnit(unit, parent))
+                    );
+                default:
+                    return left(
+                        _createError(
+                            'NODE_COMPILE_ERROR',
+                            'Unimplemented error'
+                        )
+                    );
+            }
+        })
+    );
