@@ -36,14 +36,13 @@ import {
 import { createError, ERR } from '../error';
 import { head, filter } from 'lodash';
 import YAML from 'yaml';
-// import { TF } from '@lib/connector';
 import * as TF from '@tensorflow/tfjs';
 import {
     compileOptimizer,
     createOptimizer,
     Optimizer,
     validateOptimizer,
-} from '@lib/model/optimizer';
+} from './optimizer';
 
 export interface Model {
     id: string;
@@ -368,12 +367,8 @@ export const compileModel = (model: Model): Either<ERR, TF.LayersModel> =>
             const _l = (message: unknown, inner?: ERR) =>
                 left(_createError('MODEL_COMPILE_ERROR', message, inner));
 
-            const nodesList = flatNodeThree(model.root).slice(1);
-
-            // create apply three
-            const nodeIdToNodeMap = new Map(
-                nodesList.map((node) => [node.id, node])
-            );
+            const nodesList = flatNodeThree(model.root);
+            nodesList.splice(0, 1);
 
             // set all struct nodes
             const nodesShakeList = new Map(
@@ -411,13 +406,24 @@ export const compileModel = (model: Model): Either<ERR, TF.LayersModel> =>
                             isNodeShakeStateReady(nodesShakeList, x)
                     )
                     .forEach((readyNode) => {
-                        readyNode.compiled = compileNode(
+                        let compiledResult = compileNode(
                             readyNode.node,
                             readyNode.dependsToId
                                 ? nodesShakeList.get(readyNode.dependsToId)!
                                       .compiled
                                 : undefined
                         );
+
+                        // TODO: F-bombs distribution here. I do not have a fuck what is happening here!
+                        while (compiledResult._tag) {
+                            if (compiledResult._tag == 'Left') {
+                                return left(compiledResult);
+                            }
+
+                            compiledResult = compiledResult.right;
+                        }
+
+                        readyNode.compiled = compiledResult;
                         if (readyNode.joinWithId.length) {
                             readyNode.compiled = TF.layers
                                 .concatenate()
@@ -471,7 +477,8 @@ export const compileModel = (model: Model): Either<ERR, TF.LayersModel> =>
                         () => {
                             tfModel.compile({
                                 optimizer,
-                                loss: ['mse', 'valmse'],
+                                metrics: ['accuracy'],
+                                loss: 'categoricalCrossentropy',
                             });
 
                             return tfModel;

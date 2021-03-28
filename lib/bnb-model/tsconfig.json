@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "Node",
     "target": "es2016",
     "sourceMap": false,
     "strict": true,
@@ -12,6 +12,7 @@
     "removeComments": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": "./",
+    "outDir": "build",
     "paths": {
       "@lib/*": ["lib/*"],
       "@test/*": ["test/*"]
@@ -22,7 +23,8 @@
     "transpileOnly": true
   },
   "exclude": [
-    "./scripts"
+    "./scripts",
+    "./build"
   ],
   "include": [
     "./lib/**/*.ts",

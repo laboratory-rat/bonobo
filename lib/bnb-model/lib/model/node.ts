@@ -305,9 +305,9 @@ export const deepCloneRootNode = (payload: {
 
 export const applyUnitToNode = (
     node: ModelNode
-): ((unit: ModelUnit) => Either<ERR, ModelNode>) => (
+): ((unit: ModelUnit) => Either<ERR, ModelUnit>) => (
     unit: ModelUnit
-): Either<ERR, ModelNode> =>
+): Either<ERR, ModelUnit> =>
     pipe(
         node,
         fromNullable(_createError('NODE_APPLY_ERROR', 'Node is null')),
@@ -323,7 +323,7 @@ export const applyUnitToNode = (
                 case '_struct':
                     pair.node._unit = pair.unit;
                     pair.node.unitId = pair.unit.id;
-                    return validateNode(pair.node);
+                    return right(pair.unit);
                 default:
                     return left(
                         _createError(
@@ -591,8 +591,8 @@ export const validateNode = (node: ModelNode): Either<ERR, ModelNode> =>
                                 (x) => of<ERR, StructureNode>(x),
                                 chain(_validateStructUnitId),
                                 chain(_validateStructUnit),
-                                chain(_validateStructParent),
-                                chain(_validateNodeChildren)
+                                chain(_validateStructParent)
+                                // chain(_validateNodeChildren) TODO: Bad validation.
                             );
                         case '_reference':
                             return pipe(

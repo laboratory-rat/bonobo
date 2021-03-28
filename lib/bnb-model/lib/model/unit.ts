@@ -2,6 +2,7 @@ import { generateRandomId } from '../util/util';
 import {
     chain,
     Either,
+    flatten,
     fromNullable,
     left,
     map,
@@ -16,9 +17,8 @@ import {
     validateActivation,
 } from './activation';
 import { pipe } from 'fp-ts/function';
-import { Model } from '@lib/model/model';
+import { Model } from './model';
 import { head, filter } from 'lodash';
-import { LayerChainType } from '@lib/util/types';
 import { TF } from '../connector';
 
 export type ModelUnit =
@@ -366,8 +366,8 @@ export const compileUnit = (unit: ModelUnit, parent?: any): Either<ERR, any> =>
             let result;
             switch (unit.type) {
                 case '_input':
-                    result = TF.layers.inputLayer({
-                        inputShape: unit.options.shape,
+                    result = TF.input({
+                        shape: unit.options.shape,
                     });
                     break;
                 case '_output':
@@ -375,8 +375,11 @@ export const compileUnit = (unit: ModelUnit, parent?: any): Either<ERR, any> =>
                     result = TF.layers
                         .dense({
                             units: unit.options.units,
+                            useBias: true,
+                            kernelInitializer: 'zeros',
                         })
                         .apply(parent);
+
                     if (unit.options.activation) {
                         result = compileActivation(
                             unit.options.activation,
@@ -386,9 +389,12 @@ export const compileUnit = (unit: ModelUnit, parent?: any): Either<ERR, any> =>
                     break;
                 case '_transform':
                 case '_recurrent':
-                    return createError('UNIT_COMPILE_ERROR', 'Not implemented');
+                default:
+                    return left(
+                        createError('UNIT_COMPILE_ERROR', 'Not implemented')
+                    );
             }
 
-            return result;
+            return right(result);
         })
     );

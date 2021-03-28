@@ -9,12 +9,8 @@ import {
     right,
     tryCatch,
 } from 'fp-ts/Either';
-import * as O from 'fp-ts/Option';
 import { pipe } from 'fp-ts/function';
 import { TF } from '../connector';
-import { Tensor } from '@tensorflow/tfjs-core';
-import { SymbolicTensor } from '@tensorflow/tfjs-layers/dist/engine/topology';
-import { LayerChainType } from '@lib/util/types';
 
 export type ActivationType =
     | 'elu'

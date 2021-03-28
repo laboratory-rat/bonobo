@@ -10,7 +10,8 @@
     "test": "mocha --require ts-node/register ./test/**/*.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "docs": "typedoc --options typedoc.json --excludeExternals"
+    "docs": "typedoc --options typedoc.json --excludeExternals",
+    "build": "tsc --build"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.3.0",

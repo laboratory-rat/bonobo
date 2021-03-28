@@ -1,8 +1,8 @@
-import { ErrorTypeNode } from '@lib/model/node';
-import { ErrorTypeModel } from '@lib/model/model';
-import { ErrorTypeUnit } from '@lib/model/unit';
-import { ErrorTypeActivation } from '@lib/model/activation';
-import { ErrorTypeOptimizer } from '@lib/model/optimizer';
+import { ErrorTypeNode } from '../model/node';
+import { ErrorTypeModel } from '../model/model';
+import { ErrorTypeUnit } from '../model/unit';
+import { ErrorTypeActivation } from '../model/activation';
+import { ErrorTypeOptimizer } from '../model/optimizer';
 
 export type ErrorType =
     | ErrorTypeModel

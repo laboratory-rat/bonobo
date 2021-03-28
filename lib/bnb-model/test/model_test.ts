@@ -1,4 +1,5 @@
 import {
+    compileModel,
     createEmptyModel,
     modelParseJSON,
     modelParseYAML,
@@ -18,6 +19,89 @@ import {
     createUnit,
 } from '../lib/model/index';
 
+const _createSimpleModel = () =>
+    pipe(
+        createEmptyModel(),
+        chain((model) =>
+            pipe(
+                createNode({ type: '_struct', parent: model.root }),
+                chain((inputNode) =>
+                    pipe(
+                        createUnit({
+                            type: '_input',
+                            options: {
+                                type: '_input',
+                                shape: [10],
+                            },
+                        }),
+                        chain(applyUnitToNode(inputNode)),
+                        chain(applyUnitToModel(model)),
+                        chain((_) =>
+                            pipe(
+                                createNode({
+                                    type: '_struct',
+                                    parent: inputNode,
+                                }),
+                                chain((hiddenNode) =>
+                                    pipe(
+                                        createUnit({
+                                            type: '_sequential',
+                                            options: {
+                                                type: '_sequential',
+                                                activation: {
+                                                    type: 'linear',
+                                                },
+                                                units: 5,
+                                                shape: [10],
+                                            },
+                                        }),
+                                        chain(applyUnitToNode(hiddenNode)),
+                                        chain(applyUnitToModel(model)),
+                                        chain((_) =>
+                                            pipe(
+                                                createNode({
+                                                    type: '_struct',
+                                                    parent: hiddenNode,
+                                                }),
+                                                chain((outputNode) =>
+                                                    pipe(
+                                                        createUnit({
+                                                            type: '_output',
+                                                            options: {
+                                                                type: '_output',
+                                                                shape: [1, 1],
+                                                                units: 1,
+                                                                activation: {
+                                                                    type:
+                                                                        'linear',
+                                                                },
+                                                            },
+                                                        }),
+                                                        chain(
+                                                            applyUnitToNode(
+                                                                outputNode
+                                                            )
+                                                        ),
+                                                        chain(
+                                                            applyUnitToModel(
+                                                                model
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                map((_) => model)
+            )
+        )
+    );
+
 const _createModel = () =>
     pipe(
         createEmptyModel(),
@@ -28,7 +112,7 @@ const _createModel = () =>
                     pipe(
                         createUnit({
                             type: '_input',
-                            options: { type: '_input', shape: [null, 8] },
+                            options: { type: '_input', shape: [1, 8] },
                         }),
                         chain(applyUnitToModel(model)),
                         chain(applyUnitToNode(inputN)),
@@ -225,18 +309,21 @@ describe('Array', () => {
 describe('Model', () => {
     it('#create', () => {
         pipe(
-            _createModel(),
+            _createSimpleModel(),
             chain(modelSerializeYAML),
             (yaml) => {
                 return yaml;
             },
             chain(modelParseYAML),
-            (x) => {
-                const s = x;
-                return x;
-            },
             chain(validateModel),
-            chain(splitToLayers),
+            chain((model) =>
+                pipe(
+                    model,
+                    splitToLayers,
+                    map((_) => model)
+                )
+            ),
+            chain(compileModel),
             fold(
                 (err) => {
                     assert.strictEqual(

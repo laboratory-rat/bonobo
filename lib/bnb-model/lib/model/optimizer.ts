@@ -7,9 +7,9 @@ import {
     right,
     tryCatch,
 } from 'fp-ts/Either';
-import { createError, ERR } from '@lib/error';
+import { createError, ERR } from '../error';
 import { pipe } from 'fp-ts/function';
-import { TF } from '@lib/connector';
+import { TF } from '../connector';
 
 export type Optimizer =
     | OptimizerSGD

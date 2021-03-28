@@ -1,4 +1,4 @@
-import { TF } from '@lib/connector';
+import { TF } from '../connector';
 
 export type LayerChainType = TF.SymbolicTensor | TF.layers.Layer;
 
