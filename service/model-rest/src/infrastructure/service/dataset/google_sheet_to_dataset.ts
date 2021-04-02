@@ -2,13 +2,13 @@ import { Dataset } from '~/bnb-model/lib/dataset/index';
 import * as E from '~/fp-ts/Either';
 import * as F from '~/fp-ts/function';
 import * as TE from '~/fp-ts/TaskEither';
-import { createGoogleSpreadsheetDatasetServiceError } from '@/infrastructure/error/dataset_service_error';
+import { createDatasetServiceError } from '@/infrastructure/error/dataset_service_error';
 import { createGoogleSpreadsheetReader } from '@/connector/google_spreadsheet';
 import { ServiceError } from '@/infrastructure/error';
 import { DatasetTable } from '~/bnb-model/lib/dataset/dataset';
 import moment from '~/moment/moment';
 
-const _e = createGoogleSpreadsheetDatasetServiceError;
+const _e = createDatasetServiceError;
 
 export const uploadGoogleSpreadsheetAndParse = (
     id: string

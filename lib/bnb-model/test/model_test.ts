@@ -52,7 +52,7 @@ const _createSimpleModel = () =>
                                                     type: 'linear',
                                                 },
                                                 units: 5,
-                                                shape: [10],
+                                                useBias: true,
                                             },
                                         }),
                                         chain(applyUnitToNode(hiddenNode)),
@@ -69,8 +69,8 @@ const _createSimpleModel = () =>
                                                             type: '_output',
                                                             options: {
                                                                 type: '_output',
-                                                                shape: [1, 1],
                                                                 units: 1,
+                                                                useBias: true,
                                                                 activation: {
                                                                     type:
                                                                         'linear',
@@ -85,202 +85,6 @@ const _createSimpleModel = () =>
                                                         chain(
                                                             applyUnitToModel(
                                                                 model
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                map((_) => model)
-            )
-        )
-    );
-
-const _createModel = () =>
-    pipe(
-        createEmptyModel(),
-        chain((model) =>
-            pipe(
-                createNode({ type: '_struct', parent: model.root }),
-                chain((inputN) =>
-                    pipe(
-                        createUnit({
-                            type: '_input',
-                            options: { type: '_input', shape: [1, 8] },
-                        }),
-                        chain(applyUnitToModel(model)),
-                        chain(applyUnitToNode(inputN)),
-                        chain((_) =>
-                            pipe(
-                                createNode({
-                                    type: '_struct',
-                                    parent: inputN,
-                                }),
-                                chain((logicN1) =>
-                                    pipe(
-                                        createUnit({
-                                            type: '_sequential',
-                                            options: {
-                                                shape: [null, 100],
-                                                type: '_input',
-                                            },
-                                        }),
-                                        chain(applyUnitToModel(model)),
-                                        chain(applyUnitToNode(logicN1)),
-                                        chain((_) =>
-                                            pipe(
-                                                createNode({
-                                                    type: '_struct',
-                                                    parent: logicN1,
-                                                }),
-                                                chain((logicN2_1) =>
-                                                    pipe(
-                                                        createUnit({
-                                                            type: '_sequential',
-                                                            options: {
-                                                                type:
-                                                                    '_sequential',
-                                                                shape: [
-                                                                    null,
-                                                                    12,
-                                                                ],
-                                                                units: 5,
-                                                                activation: {
-                                                                    type:
-                                                                        'relu',
-                                                                    maxValue: 1,
-                                                                },
-                                                            },
-                                                        }),
-                                                        chain(
-                                                            applyUnitToModel(
-                                                                model
-                                                            )
-                                                        ),
-                                                        chain(
-                                                            applyUnitToNode(
-                                                                logicN2_1
-                                                            )
-                                                        ),
-                                                        chain((_) =>
-                                                            pipe(
-                                                                createNode({
-                                                                    type:
-                                                                        '_struct',
-                                                                    parent: logicN1,
-                                                                }),
-                                                                chain(
-                                                                    (
-                                                                        logicN2_2
-                                                                    ) =>
-                                                                        pipe(
-                                                                            createUnit(
-                                                                                {
-                                                                                    type:
-                                                                                        '_sequential',
-                                                                                    options: {
-                                                                                        type:
-                                                                                            '_sequential',
-                                                                                        shape: [
-                                                                                            null,
-                                                                                            12,
-                                                                                        ],
-                                                                                        units: 10,
-                                                                                        activation: {
-                                                                                            type:
-                                                                                                'relu',
-                                                                                            maxValue: 1,
-                                                                                        },
-                                                                                    },
-                                                                                }
-                                                                            ),
-                                                                            chain(
-                                                                                applyUnitToModel(
-                                                                                    model
-                                                                                )
-                                                                            ),
-                                                                            chain(
-                                                                                applyUnitToNode(
-                                                                                    logicN2_2
-                                                                                )
-                                                                            ),
-                                                                            chain(
-                                                                                (
-                                                                                    _
-                                                                                ) =>
-                                                                                    pipe(
-                                                                                        createNode(
-                                                                                            {
-                                                                                                type:
-                                                                                                    '_struct',
-                                                                                                parent: logicN2_1,
-                                                                                            }
-                                                                                        ),
-                                                                                        chain(
-                                                                                            (
-                                                                                                outN1
-                                                                                            ) =>
-                                                                                                pipe(
-                                                                                                    createUnit(
-                                                                                                        {
-                                                                                                            type:
-                                                                                                                '_output',
-                                                                                                            options: {
-                                                                                                                type:
-                                                                                                                    '_output',
-                                                                                                                shape: [
-                                                                                                                    null,
-                                                                                                                    1,
-                                                                                                                ],
-                                                                                                                units: 1,
-                                                                                                                activation: {
-                                                                                                                    type:
-                                                                                                                        'relu',
-                                                                                                                },
-                                                                                                            },
-                                                                                                        }
-                                                                                                    ),
-                                                                                                    chain(
-                                                                                                        applyUnitToModel(
-                                                                                                            model
-                                                                                                        )
-                                                                                                    ),
-                                                                                                    chain(
-                                                                                                        applyUnitToNode(
-                                                                                                            outN1
-                                                                                                        )
-                                                                                                    ),
-                                                                                                    chain(
-                                                                                                        (
-                                                                                                            _
-                                                                                                        ) =>
-                                                                                                            pipe(
-                                                                                                                createNode(
-                                                                                                                    {
-                                                                                                                        type:
-                                                                                                                            '_reference',
-                                                                                                                        parent: logicN2_2,
-                                                                                                                    }
-                                                                                                                ),
-                                                                                                                chain(
-                                                                                                                    applyNodeToNode(
-                                                                                                                        outN1
-                                                                                                                    )
-                                                                                                                )
-                                                                                                            )
-                                                                                                    )
-                                                                                                )
-                                                                                        )
-                                                                                    )
-                                                                            )
-                                                                        )
-                                                                )
                                                             )
                                                         )
                                                     )

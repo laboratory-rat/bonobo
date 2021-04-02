@@ -1,4 +1,4 @@
-import { DatasetSourceType } from './source';
+import { DatasetTableSource } from './source';
 
 export type DatasetColType = DatasetColTypeNumber | DatasetColTypeString;
 
@@ -17,12 +17,11 @@ export interface DatasetColTypeString extends BaseDatasetColType {
 export interface DatasetMetadata {
     id: string;
     name: string;
-    userID: string;
     header: DatasetMetadataHeader[];
     examples: DatasetMetadataCol[];
     size: number;
     datasetReference: string;
-    sourceType: DatasetSourceType;
+    sourceType: DatasetTableSource;
     sourceReference: string;
     isTemporary: boolean;
     isArchived: boolean;

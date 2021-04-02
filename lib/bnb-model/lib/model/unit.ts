@@ -100,25 +100,23 @@ export interface UnitOptionsInput extends BaseUnitOptions {
 export interface UnitOptionsSequential extends BaseUnitOptions {
     type: '_sequential';
     units: number;
-    shape: (null | number)[];
     activation?: Activation;
+    useBias: boolean;
 }
 
 export interface UnitOptionsRecurrent extends BaseUnitOptions {
     type: '_recurrent';
-    shape: (null | number)[];
 }
 
 export interface UnitOptionsTransform extends BaseUnitOptions {
     type: '_transform';
-    shape: (null | number)[];
 }
 
 export interface UnitOptionsOutput extends BaseUnitOptions {
     type: '_output';
     units: number;
-    shape: (null | number)[];
     activation?: Activation;
+    useBias: boolean;
 }
 
 export const createUnit = (payload: {
@@ -161,7 +159,7 @@ export const createUnit = (payload: {
                     activation: {
                         type: 'relu',
                     },
-                    shape: [null, 1],
+                    useBias: true,
                 },
             });
 
@@ -209,8 +207,8 @@ export const createUnit = (payload: {
                 id: _id,
                 options: options ?? {
                     type: '_output',
-                    shape: [null, 1],
                     units: 1,
+                    useBias: true,
                 },
             });
 
@@ -307,11 +305,6 @@ export const validateUnit = (unit: ModelUnit): Either<ERR, ModelUnit> =>
                                 'Sequential unit require options'
                             )
                         ),
-                        chain((options) =>
-                            _validateShape<UnitOptionsSequential>(
-                                options.shape
-                            )(options)
-                        ),
                         chain(({ activation }) =>
                             activation
                                 ? validateActivation(activation)
@@ -342,9 +335,6 @@ export const validateUnit = (unit: ModelUnit): Either<ERR, ModelUnit> =>
                                 'UNIT_VALIDATION_ERROR',
                                 'Output unit options is required'
                             )
-                        ),
-                        chain((options) =>
-                            _validateShape(options.shape)(options)
                         ),
                         map((_) => unit)
                     );

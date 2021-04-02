@@ -33,8 +33,9 @@ const TE = __importStar(require("../../../../node_modules/fp-ts/TaskEither"));
 const E = __importStar(require("../../../../node_modules/fp-ts/Either"));
 const error_1 = require("../../../infrastructure/error");
 const DatasetMetadataRepository_1 = require("../../../infrastructure/repository/DatasetMetadataRepository");
+const dataset_file_1 = require("../../../infrastructure/service/dataset/dataset_file");
 exports.default = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const body = req.body;
-    yield F.pipe(body, E.fromNullable(error_1.createServiceError('BAD_MODEL', 'Model is null')), TE.fromEither, TE.chain((model) => F.pipe(DatasetMetadataRepository_1.dbReadDatasetMetadataEntity(body.id))));
+    yield F.pipe(body, E.fromNullable(error_1.createServiceError('BAD_MODEL', 'Model is null')), TE.fromEither, TE.chain((model) => F.pipe(DatasetMetadataRepository_1.dbReadDatasetMetadataEntity(body.id), TE.map((entity) => ({ entity, model })))), TE.chain((pair) => F.pipe(dataset_file_1.datasetReadFile(pair.entity.source), TE.fromEither, TE.map((dataset) => (Object.assign(Object.assign({}, pair), { dataset }))))));
 });
 //# sourceMappingURL=approve_googlesheets.js.map

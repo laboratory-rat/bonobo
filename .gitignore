@@ -8,3 +8,6 @@
 **/build/
 **/dist_electron/
 **/docker-compose.yml
+**/.env
+**/_data/
+**/model-rest/dist/*
