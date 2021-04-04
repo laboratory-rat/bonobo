@@ -1,9 +1,0 @@
-POST http://localhost:8888/v1/dataset/create/google_sheet
-Content-Type: application/json
-
-{
-  "id": "1aPutb-adaABiY4jlFuldib-aZRN8PAbl6vRQdZDkfgk"
-}
-
-#####
-GET http://localhost:8888
