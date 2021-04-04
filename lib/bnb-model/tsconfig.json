@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "Node",
+    "target": "es2016",
+    "sourceMap": false,
+    "strict": true,
+    "lib": ["es2017"],
+    "noImplicitAny": false,
+    "declaration": false,
+    "esModuleInterop": true,
+    "removeComments": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "./",
+    "outDir": "build",
+    "paths": {
+      "@lib/*": ["lib/*"],
+      "@test/*": ["test/*"]
+    },
+    "skipLibCheck": true
+  },
+  "ts-node": {
+    "transpileOnly": true
+  },
+  "exclude": [
+    "./scripts",
+    "./build"
+  ],
+  "include": [
+    "./lib/**/*.ts",
+    "./test/**/*.ts"
+  ]
+}

@@ -1,0 +1,30 @@
+### Add test spreadsheet to db
+GET http://127.0.0.1:8080/v1/dataset/create/spreadsheet/{dev.SPREADSHEET_ID}
+Accept: application/json
+
+### Read dataset rows from db
+GET http://127.0.0.1:8080/v1/dataset/read/-MOfZXnNY0seECiaOfe_/0/100
+Accept: application/json
+
+###
+PUT http://127.0.0.1:8080/v1/dataset/approve/-MOhH2q6Bp8S2FTbADpc
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "test_changed",
+  "header": [
+    {
+      "origin_index": 2,
+      "index": 0,
+      "title": "Cylinders-changed",
+      "decimals": 2
+    },
+    {
+      "origin_index": 4,
+      "index": 1,
+      "title": "Horsepower-changed",
+      "decimals": 2
+    }
+  ]
+}
