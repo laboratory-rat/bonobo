@@ -1,10 +1,7 @@
 import * as F from '~/fp-ts/function';
 import * as E from '~/fp-ts/Either';
 import * as TE from '~/fp-ts/TaskEither';
-import { DatasetMetadataEntity } from '@/infrastructure/entity/DatasetMetadataEntity';
 import { DatasetTableApproveModel } from '@/infrastructure/model/dataset';
-import { Dataset } from '~/bnb-model/lib/dataset/index';
-import { DatasetServiceError } from '@/infrastructure/error/dataset_service_error';
 import { createServiceError, ServiceError } from '@/infrastructure/error';
 import { dbReadDatasetMetadataEntity, dbUpdateMetadataEntity } from '@/infrastructure/repository/DatasetMetadataRepository';
 import { datasetDeleteFile, datasetReadFile, datasetWriteFile } from '@/infrastructure/service/dataset/dataset_file';
@@ -66,6 +63,7 @@ export const applyApproveToDataset = (model: DatasetTableApproveModel): TE.TaskE
                     dataset.header = updatedHeader;
                     metadata.outputsCount = updatedHeader.filter((x) => x.isOutput).length;
                     metadata.inputsCount = updatedHeader.length - metadata.outputsCount;
+                    metadata.columnsCount = metadata.inputsCount + metadata.outputsCount;
                     metadata.name = model.name;
                     dataset.updatedTime = moment().unix();
                     metadata.updatedTime = moment().unix();

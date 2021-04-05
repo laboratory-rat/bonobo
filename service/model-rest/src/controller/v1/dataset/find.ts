@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as F from '~/fp-ts/function';
 import * as TE from '~/fp-ts/TaskEither';
+import * as T from '~/fp-ts/Task';
 import { DatasetFilterModel, DatasetFindResponse } from '@/infrastructure/model/dataset';
 import { dbCountMetadataEntity, dbFindMetadataEntity } from '@/infrastructure/repository/DatasetMetadataRepository';
 
@@ -11,6 +12,10 @@ export default async (req: Request, res: Response) => {
         sort: 'updatedTime',
         desc: true,
         filter: {},
+    };
+    filter.filter = {
+        ...filter.filter,
+        isTemporary: false,
     };
 
     await F.pipe(
@@ -33,11 +38,11 @@ export default async (req: Request, res: Response) => {
             (err) => {
                 res.status(400);
                 res.send(err);
-                return null;
+                return T.never;
             },
             (result) => {
                 res.send(result);
-                return null;
+                return T.never;
             }
         )
     )();

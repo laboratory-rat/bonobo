@@ -6,7 +6,7 @@ export interface FileConfig {
 }
 
 export const createFileConfig = (): FileConfig => ({
-    datasetPath: '_data/dataset',
+    datasetPath: '_data/dataset/saved',
     datasetTmpPath: '_data/dataset/tmp',
     modelPath: '_data/model',
     modelTFPath: '_data/tf_model',

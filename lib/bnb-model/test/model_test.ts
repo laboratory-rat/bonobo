@@ -71,6 +71,10 @@ const _createSimpleModel = () =>
                                                                 type: '_output',
                                                                 units: 1,
                                                                 useBias: true,
+                                                                shape: [
+                                                                    null,
+                                                                    1,
+                                                                ],
                                                                 activation: {
                                                                     type:
                                                                         'linear',

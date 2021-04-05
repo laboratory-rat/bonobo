@@ -22,7 +22,7 @@ export const dbReadDatasetMetadataEntity = (id: string): TE.TaskEither<ServiceEr
 export const dbUpdateMetadataEntity = (metadata: DatasetMetadataEntity): TE.TaskEither<ServiceError, DatasetMetadataEntity> =>
     connectMongoDb(async (db) => {
         metadata.updatedTime = moment().unix();
-        const result = await db.collection(_collection).updateOne({ id: metadata.id }, metadata);
+        const result = await db.collection(_collection).updateOne({ id: metadata.id }, { $set: metadata });
         if (result.modifiedCount != 1) {
             throw 'Metadata not found by id ' + metadata.id;
         }
@@ -34,7 +34,7 @@ export const dbFindMetadataEntity = (skip: number, limit: number, filter: Datase
     connectMongoDb(async (db) => {
         const query = db.collection(_collection).find(filter.filter ?? {});
         if (filter.sort) {
-            query.sort(filter.sort, filter.desc ? 1 : 0);
+            query.sort(filter.sort, filter.desc ? 0 : 1);
         }
 
         const result = await query.skip(skip).limit(limit);

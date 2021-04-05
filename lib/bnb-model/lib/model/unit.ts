@@ -114,6 +114,7 @@ export interface UnitOptionsTransform extends BaseUnitOptions {
 
 export interface UnitOptionsOutput extends BaseUnitOptions {
     type: '_output';
+    shape: (number | null)[];
     units: number;
     activation?: Activation;
     useBias: boolean;
@@ -209,6 +210,7 @@ export const createUnit = (payload: {
                     type: '_output',
                     units: 1,
                     useBias: true,
+                    shape: [null, 1],
                 },
             });
 
