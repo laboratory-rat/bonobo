@@ -3,13 +3,15 @@ import { ModelUnit, parsePrepareUnit, serializePrepareUnit, validateUnit } from 
 import { generateRandomId, generateRandomName } from '../util/util';
 import moment from 'moment';
 import { pipe } from 'fp-ts/function';
+import * as TE from 'fp-ts/TaskEither';
 import { chain, Either, fromNullable, isLeft, Left, left, map, mapLeft, of, right, tryCatch } from 'fp-ts/Either';
 import { createError, ERR } from '../error';
 import { filter, head } from 'lodash';
 import YAML from 'yaml';
 import { TF } from '../connector';
 import { compileOptimizer, createOptimizer, Optimizer, validateOptimizer } from './optimizer';
-import { ModelNormalizeStrategy, TrainOptions } from '@lib/model/train_options';
+import { TrainOptions } from '@lib/model/train_options';
+import { ModelNormalizationData } from '@lib/model/normalization';
 
 export interface Model {
     id: string;
@@ -25,6 +27,7 @@ export interface TrainResults {
     finishedAt: number;
     epochsCount: number;
     finalScore: unknown;
+    normalization: ModelNormalizationData;
 }
 
 export type ErrorTypeModel = 'MODEL_CREATE_ERROR' | 'MODEL_SERIALIZE_ERROR' | 'MODEL_PARSE_ERROR' | 'MODEL_CLONE_ERROR' | 'MODEL_VALIDATION_ERROR' | 'MODEL_COMPILE_ERROR' | 'MODEL_SPLIT_TO_LAYERS_ERROR' | 'MODEL_TRAIN_ERROR';
@@ -325,12 +328,44 @@ export const compileModel = (model: Model, optimizer: Optimizer): Either<ERR, TF
 
 const _checkTrainModelArgument = <TItem, TResult>(item: TItem, argumentName: string, callback: (TItem) => TResult): Either<ERR, TResult> => pipe(item, fromNullable(_createError('MODEL_TRAIN_ERROR', `Argument ${argumentName} is null`)), map(callback));
 
-export const trainModel = (props: { model: TF.LayersModel; optimizer: Optimizer; options: TrainOptions; input: (number | string)[][][]; label: (number | string)[][][] }): unknown =>
+export const trainModel = (props: {
+    model: TF.LayersModel;
+    optimizer: Optimizer;
+    options: TrainOptions;
+    input: TF.Tensor<TF.Rank.R3>;
+    label: TF.Tensor<TF.Rank.R3>;
+    callbacks?: { batchEnd: (batch: number, logs: TF.Logs | undefined) => Promise<void> | undefined; onTrainEnd: (logs: TF.Logs | undefined) => Promise<void> | undefined };
+}): TE.TaskEither<ERR, { model: TF.LayersModel; history: TF.History }> =>
     pipe(
         _checkTrainModelArgument<TF.LayersModel, { model: TF.LayersModel }>(props.model, 'model', (model: TF.LayersModel) => ({ model })),
         chain((payload) => _checkTrainModelArgument<Optimizer, { model: TF.LayersModel; optimizer: Optimizer }>(props.optimizer, 'optimizer', (optimizer: Optimizer) => ({ optimizer, ...payload }))),
         chain((payload) => _checkTrainModelArgument<TrainOptions, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions }>(props.options, 'train options', (trainOptions) => ({ trainOptions, ...payload }))),
-        chain((payload) => _checkTrainModelArgument<(number | string)[][][], { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: (number | string)[][][] }>(props.input, 'input', (input) => ({ input, ...payload }))),
-        chain((payload) => _checkTrainModelArgument<(number | string)[][][], { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: (number | string)[][][]; label: (number | string)[][][] }>(props.label, 'label', (label) => ({ label, ...payload }))),
-        chain(({ model, optimizer, trainOptions, input, label }) => {})
+        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3> }>(props.input, 'input', (input) => ({ input, ...payload }))),
+        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3>; label: TF.Tensor<TF.Rank.R3> }>(props.label, 'label', (label) => ({ label, ...payload }))),
+        TE.fromEither,
+        TE.chain(({ model, optimizer, trainOptions, input, label }) =>
+            TE.tryCatch(
+                async () => {
+                    const history = await model.fit(input, label, {
+                        batchSize: trainOptions.batchSize,
+                        epochs: trainOptions.epochsCount,
+                        shuffle: trainOptions.shuffleDataset,
+                        validationSplit: trainOptions.validationSplit,
+                        callbacks: {
+                            onBatchEnd: props.callbacks?.batchEnd,
+                            onTrainEnd: props.callbacks?.onTrainEnd,
+                        },
+                    });
+                    await history.syncData();
+
+                    return { model, history };
+                },
+                (error: unknown) =>
+                    _createError('MODEL_TRAIN_ERROR', 'FUCK! Some shit inside training step!', {
+                        type: 'MODEL_TRAIN_ERROR',
+                        message: String(error),
+                        innerError: null,
+                    })
+            )
+        )
     );

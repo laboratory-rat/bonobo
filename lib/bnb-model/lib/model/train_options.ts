@@ -5,4 +5,5 @@ export interface TrainOptions {
     normalizeStrategy: ModelNormalizationStrategy;
     batchSize: number;
     shuffleDataset: boolean;
+    validationSplit?: number;
 }
