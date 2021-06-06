@@ -1,30 +1,27 @@
 import { Request, Response } from 'express';
-import * as F from '~/fp-ts/function';
-import * as TE from '~/fp-ts/TaskEither';
+import { ModelEntity } from '@/infrastructure/entity/model_entity';
 import * as T from '~/fp-ts/Task';
-import { DatasetFilterModel, DatasetFindResponse } from '@/infrastructure/model/dataset';
-import { dbCountMetadataEntity, dbFindMetadataEntity } from '@/infrastructure/repository/dataset_metadata_repository';
+import * as TE from '~/fp-ts/TaskEither';
+import * as F from '~/fp-ts/function';
+import { dbCountModelEntity, dbFindModelEntity } from '@/infrastructure/repository/model_repository';
 import { FilterRequestModel, FilterResponseModel } from '@/infrastructure/model/search';
-import { DatasetMetadataEntity } from '@/infrastructure/entity/dataset_metadata_entity';
+
+const _valueOr = (val: unknown) => Math.max(1, val ? parseInt(String(val)) : 0);
 
 export default async (req: Request, res: Response) => {
-    const skip = Math.max(parseInt(req.params['skip']) ?? 0, 0);
-    const limit = Math.max(parseInt(req.params['limit']) ?? 1, 1);
-    const filter = (req.body as FilterRequestModel<DatasetMetadataEntity>) ?? {
-        sort: 'updatedTime',
+    const skip = _valueOr(req.params['skip']);
+    const limit = _valueOr(req.params['limit']);
+    const filter = (req.body as FilterRequestModel<ModelEntity>) ?? {
         desc: true,
+        sort: 'createdTime',
         search: {},
-    };
-    filter.search = {
-        ...filter.search,
-        isTemporary: false,
     };
 
     await F.pipe(
-        dbFindMetadataEntity(skip, limit, filter),
+        dbFindModelEntity(skip, limit, filter),
         TE.chain((list) =>
             F.pipe(
-                dbCountMetadataEntity(filter.search),
+                dbCountModelEntity(filter?.search),
                 TE.map(
                     (total) =>
                         ({
@@ -32,7 +29,7 @@ export default async (req: Request, res: Response) => {
                             limit,
                             skip,
                             list,
-                        } as FilterResponseModel<DatasetMetadataEntity>)
+                        } as FilterResponseModel<ModelEntity>)
                 )
             )
         ),

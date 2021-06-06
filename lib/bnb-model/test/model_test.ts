@@ -1,23 +1,8 @@
-import {
-    compileModel,
-    createEmptyModel,
-    modelParseJSON,
-    modelParseYAML,
-    modelSerializeJSON,
-    modelSerializeYAML,
-    splitToLayers,
-    validateModel,
-} from '../lib/model/model';
+import { compileModel, createEmptyModel, modelParseYAML, modelSerializeYAML, splitToLayers, validateModel } from '../lib/model/model';
 import * as assert from 'assert';
 import { chain, fold, map } from 'fp-ts/Either';
 import { pipe } from 'fp-ts/function';
-import {
-    applyNodeToNode,
-    applyUnitToModel,
-    applyUnitToNode,
-    createNode,
-    createUnit,
-} from '../lib/model/index';
+import { applyUnitToModel, applyUnitToNode, createNode, createOptimizer, createUnit } from '../lib/model/index';
 
 const _createSimpleModel = () =>
     pipe(
@@ -71,26 +56,14 @@ const _createSimpleModel = () =>
                                                                 type: '_output',
                                                                 units: 1,
                                                                 useBias: true,
-                                                                shape: [
-                                                                    null,
-                                                                    1,
-                                                                ],
+                                                                shape: [null, 1],
                                                                 activation: {
-                                                                    type:
-                                                                        'linear',
+                                                                    type: 'linear',
                                                                 },
                                                             },
                                                         }),
-                                                        chain(
-                                                            applyUnitToNode(
-                                                                outputNode
-                                                            )
-                                                        ),
-                                                        chain(
-                                                            applyUnitToModel(
-                                                                model
-                                                            )
-                                                        )
+                                                        chain(applyUnitToNode(outputNode)),
+                                                        chain(applyUnitToModel(model))
                                                     )
                                                 )
                                             )
@@ -131,14 +104,10 @@ describe('Model', () => {
                     map((_) => model)
                 )
             ),
-            chain(compileModel),
+            chain((model) => compileModel(model, createOptimizer('_sgd'))),
             fold(
                 (err) => {
-                    assert.strictEqual(
-                        true,
-                        false,
-                        `type: ${err.type}. message: ${err.message}`
-                    );
+                    assert.strictEqual(true, false, `type: ${err.type}. message: ${err.message}`);
                 },
                 (model) => {
                     const m = model;

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import * as F from '~/fp-ts/function';
 import * as TE from '~/fp-ts/TaskEither';
 import * as T from '~/fp-ts/Task';
-import { dbDeleteDatasetMetadataEntity, dbReadDatasetMetadataEntity } from '@/infrastructure/repository/DatasetMetadataRepository';
+import { dbDeleteDatasetMetadataEntity, dbReadDatasetMetadataEntity } from '@/infrastructure/repository/dataset_metadata_repository';
 import { datasetDeleteFile } from '@/infrastructure/service/dataset/dataset_file';
 
 export default async (req: Request, res: Response) => {

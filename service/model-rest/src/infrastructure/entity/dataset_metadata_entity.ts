@@ -5,7 +5,7 @@ export type DatasetMetadataType = '_table' | '_image';
 export type DatasetMetadataSourceType = 'GOOGLE_SHEETS' | 'FILE';
 
 export interface DatasetMetadataEntity {
-    id: string;
+    _id: string;
     name: string;
     type: DatasetMetadataType;
     sourceType: DatasetMetadataSourceType;
@@ -21,10 +21,8 @@ export interface DatasetMetadataEntity {
     updatedTime: number;
 }
 
-export const createDatasetMetadataEntity = (
-    source?: Partial<DatasetMetadataEntity>
-): DatasetMetadataEntity => ({
-    id: source?.id ?? v4(),
+export const createDatasetMetadataEntity = (source?: Partial<DatasetMetadataEntity>): DatasetMetadataEntity => ({
+    _id: source?._id ?? v4(),
     name: source?.name ?? '',
     type: source?.type ?? '_table',
     sourceType: source?.sourceType ?? 'FILE',

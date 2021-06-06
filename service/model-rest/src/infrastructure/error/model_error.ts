@@ -1,0 +1,1 @@
+export type ModelServiceErrorCode = 'MODEL_NULL' | 'MODEL_BAD_MODEL' | 'MODEL_NOT_FOUND' | 'MODEL_CREATE_ERROR' | 'MODEL_VALIDATE_ERROR';

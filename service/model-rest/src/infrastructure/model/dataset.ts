@@ -1,5 +1,5 @@
 import { DatasetTableColType } from '~/bnb-model/lib/dataset/dataset';
-import { DatasetMetadataEntity } from '@/infrastructure/entity/DatasetMetadataEntity';
+import { DatasetMetadataEntity } from '@/infrastructure/entity/dataset_metadata_entity';
 
 export interface DatasetCreateGooglesheetsModel {
     id: string;
@@ -41,7 +41,7 @@ export interface DatasetFindResponse {
 }
 
 export interface DatasetFilterModel {
-    filter: Partial<DatasetMetadataEntity>;
+    search: Partial<DatasetMetadataEntity>;
     sort: keyof DatasetMetadataEntity;
     desc: boolean;
 }
