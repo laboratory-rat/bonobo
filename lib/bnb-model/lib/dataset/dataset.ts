@@ -3,7 +3,7 @@ import { ModelNormalizationData, ModelNormalizationStrategy } from '@lib/model/n
 import { createError, ERR } from '@lib/error';
 import * as F from 'fp-ts/function';
 import * as E from 'fp-ts/Either';
-import { normalizeTensor } from '@lib/util';
+import { denormalizeTensor, normalizeTensor, transposeMatrix, transposeMatrixRevert } from '@lib/util';
 import { TF } from '@lib/connector';
 import { tensor2d } from '@tensorflow/tfjs-node';
 
@@ -11,7 +11,7 @@ export type Dataset = DatasetTable | DatasetImage;
 export type DatasetType = '_table' | '_image';
 // export type DatasetTableColType = '_numberArray';
 export type DatasetTableColType = '_stringArray' | '_numberArray';
-export type ErrorTypeDataset = 'DATASET_NORMALIZE_ERROR';
+export type ErrorTypeDataset = 'DATASET_NORMALIZE_ERROR' | 'DATASET_DENORMALIZE_ERROR';
 
 const _createError = (type: ErrorTypeDataset, message: unknown, innerError?: ERR) => createError(type, message, innerError);
 
@@ -78,11 +78,12 @@ export const normalizeDataset = (payload: { dataset: Dataset; inputIndexes: numb
 
                     const normalizeLabels = (normalizationDataset: NormalizationDatasetResult, labels: number[][][]): NormalizationDatasetResult => {
                         if (labels.length) {
-                            const normalizedLabel = normalizeTensor(TF.tensor3d(label3d), normalizationData?.labelNormalizationMatrix?.min ? TF.tensor3d(normalizationData.labelNormalizationMatrix.min) : undefined, normalizationData?.labelNormalizationMatrix?.max ? TF.tensor3d(normalizationData.labelNormalizationMatrix.max) : undefined);
+                            const normalizedLabel = normalizeTensor(TF.tensor3d(label3d), normalizationData?.labelNormalizationMatrix?.min ? TF.tensor3d([[[normalizationData.labelNormalizationMatrix.min]]]) : undefined, normalizationData?.labelNormalizationMatrix?.max ? TF.tensor3d([[[normalizationData.labelNormalizationMatrix.max]]]) : undefined);
                             normalizationDataset.label = normalizedLabel.normalized;
+                            normalizationDataset.normalizationData.labelShape = normalizedLabel.normalized.shape;
                             normalizationDataset.normalizationData.labelNormalizationMatrix = {
-                                min: normalizedLabel.min.arraySync(),
-                                max: normalizedLabel.max.arraySync(),
+                                min: (normalizedLabel.min.arraySync() as unknown) as number,
+                                max: (normalizedLabel.max.arraySync() as unknown) as number,
                             };
                         }
 
@@ -95,25 +96,31 @@ export const normalizeDataset = (payload: { dataset: Dataset; inputIndexes: numb
                             label: label3d.length ? TF.tensor3d(label3d) : null,
                             normalizationData: {
                                 strategy,
+                                inputShape: input3dTensor.shape,
+                                labelShape: label3d.length ? TF.tensor3d(label3d).shape : null,
                                 inputNormalizationMatrix: null,
                                 inputNormalizationPairs: null,
                                 labelNormalizationMatrix: null,
+                                labelNormalizationPairs: null,
                             },
                         } as NormalizationDatasetResult;
                     }
 
                     if (strategy == 'MATRIX') {
-                        const normalizedInput = normalizeTensor(input3dTensor, normalizationData?.inputNormalizationMatrix?.min ? TF.tensor3d(normalizationData.inputNormalizationMatrix.min) : undefined, normalizationData?.inputNormalizationMatrix?.max ? TF.tensor3d(normalizationData.inputNormalizationMatrix.max) : undefined);
+                        const normalizedInput = normalizeTensor(input3dTensor, normalizationData?.inputNormalizationMatrix?.min ? TF.tensor3d([[[normalizationData.inputNormalizationMatrix.min]]]) : undefined, normalizationData?.inputNormalizationMatrix?.max ? TF.tensor3d([[[normalizationData.inputNormalizationMatrix.max]]]) : undefined);
                         const result = {
                             input: normalizedInput.normalized,
                             label: null,
                             normalizationData: {
                                 strategy,
+                                inputShape: normalizedInput.normalized.shape,
                                 inputNormalizationPairs: null,
                                 labelNormalizationMatrix: null,
+                                labelNormalizationPairs: null,
+                                labelShape: null,
                                 inputNormalizationMatrix: {
-                                    min: normalizedInput.min.arraySync(),
-                                    max: normalizedInput.max.arraySync(),
+                                    min: (normalizedInput.min.arraySync() as unknown) as number,
+                                    max: (normalizedInput.max.arraySync() as unknown) as number,
                                 },
                             },
                         } as NormalizationDatasetResult;
@@ -121,36 +128,50 @@ export const normalizeDataset = (payload: { dataset: Dataset; inputIndexes: numb
                     }
 
                     if (strategy == 'INDIVIDUAL') {
-                        const inputToColumns: number[][][] = [];
-                        const columnsNumber = input3d[0].length;
-                        for (let currentColNumber = 0; currentColNumber < columnsNumber; currentColNumber++) {
-                            inputToColumns.push(input3d.map((row) => row[currentColNumber]));
-                        }
-
-                        const normalizedPairs = inputToColumns.map((column, index) => {
-                            const min = normalizationData?.inputNormalizationPairs && normalizationData?.inputNormalizationPairs[index]?.min ? tensor2d(normalizationData?.inputNormalizationPairs[index]?.min) : undefined;
-                            const max = normalizationData?.inputNormalizationPairs && normalizationData?.inputNormalizationPairs[index]?.max ? tensor2d(normalizationData?.inputNormalizationPairs[index]?.max) : undefined;
-
+                        const inputTransposed = transposeMatrix(input3d);
+                        const normalizedPairs = inputTransposed.map((column: number[][], index) => {
+                            const min = normalizationData?.inputNormalizationPairs && normalizationData?.inputNormalizationPairs[index]?.min ? tensor2d([[normalizationData?.inputNormalizationPairs[index]?.min]]) : undefined;
+                            const max = normalizationData?.inputNormalizationPairs && normalizationData?.inputNormalizationPairs[index]?.max ? tensor2d([[normalizationData?.inputNormalizationPairs[index]?.max]]) : undefined;
                             return normalizeTensor(TF.tensor2d(column), min, max);
                         });
 
-                        const input = TF.tensor3d(normalizedPairs.map((x) => x.normalized.arraySync()));
+                        const inputNormalizedArray = transposeMatrixRevert(normalizedPairs.map((x) => x.normalized.arraySync()));
+                        const input = TF.tensor3d(inputNormalizedArray as number[][][]);
 
                         const result = {
                             input,
                             label: null,
                             normalizationData: {
                                 strategy,
+                                inputShape: input.shape,
+                                labelShape: null,
+                                labelNormalizationPairs: null,
                                 inputNormalizationMatrix: null,
                                 inputNormalizationPairs: normalizedPairs.map((x) => ({
-                                    min: x.min.arraySync(),
-                                    max: x.max.arraySync(),
+                                    min: (x.min.arraySync() as unknown) as number,
+                                    max: (x.max.arraySync() as unknown) as number,
                                 })),
                                 labelNormalizationMatrix: null,
                             },
                         } as NormalizationDatasetResult;
 
-                        return normalizeLabels(result, label3d);
+                        if (label3d.length) {
+                            const labelTransposed = transposeMatrix(label3d);
+                            const labelNormalizedPairs = labelTransposed.map((column: number[][], index) => {
+                                const min = normalizationData?.labelNormalizationPairs && normalizationData.labelNormalizationPairs[index]?.min ? tensor2d([[normalizationData.labelNormalizationPairs[index].min]]) : undefined;
+                                const max = normalizationData?.labelNormalizationPairs && normalizationData.labelNormalizationPairs[index]?.max ? tensor2d([[normalizationData.labelNormalizationPairs[index].max]]) : undefined;
+                                return normalizeTensor(TF.tensor2d(column), min, max);
+                            });
+                            const labelNormalizedArray = transposeMatrixRevert(labelNormalizedPairs.map((x) => x.normalized.arraySync()));
+                            result.label = TF.tensor3d(labelNormalizedArray as number[][][]);
+                            result.normalizationData.labelShape = TF.tensor3d(labelNormalizedArray as number[][][]).shape;
+                            result.normalizationData.labelNormalizationPairs = labelNormalizedPairs.map((x) => ({
+                                max: (x.max.arraySync() as unknown) as number,
+                                min: (x.min.arraySync() as unknown) as number,
+                            }));
+                        }
+
+                        return result;
                     }
 
                     throw `Unknown normalize strategy ${strategy}`;
@@ -160,3 +181,47 @@ export const normalizeDataset = (payload: { dataset: Dataset; inputIndexes: numb
         )
     );
 };
+
+export const denormalizeResponse = (payload: { response: TF.Tensor3D; strategy: ModelNormalizationStrategy; normalizationData?: ModelNormalizationData }): E.Either<ERR, TF.Tensor3D> =>
+    F.pipe(
+        payload.response,
+        E.fromNullable(_createError('DATASET_DENORMALIZE_ERROR', 'Response is null')),
+        E.chain((response) =>
+            E.tryCatch(
+                () => {
+                    const { strategy, normalizationData } = payload;
+                    if (strategy == 'NONE') {
+                        return response;
+                    }
+
+                    if (!normalizationData) {
+                        throw `Normalization data is required on strategy ${strategy}`;
+                    }
+
+                    switch (strategy) {
+                        case 'MATRIX': {
+                            if (!normalizationData.labelNormalizationMatrix?.min || !normalizationData.labelNormalizationMatrix?.max) {
+                                throw 'No normalization data';
+                            }
+                            const { min, max } = normalizationData.labelNormalizationMatrix;
+                            return denormalizeTensor(response, TF.tensor3d([[[min]]]), TF.tensor3d([[[max]]]));
+                        }
+                        case 'INDIVIDUAL': {
+                            if (!normalizationData.labelNormalizationPairs?.length) {
+                                throw 'No normalization pairs found';
+                            }
+
+                            const responseToColumns = transposeMatrix(response.arraySync())
+                                .map((col, index) => denormalizeTensor(TF.tensor2d(col), TF.tensor2d([[normalizationData.labelNormalizationPairs![index].min]]), TF.tensor2d([[normalizationData.labelNormalizationPairs![index].max]])))
+                                .map((tensor) => tensor.arraySync());
+
+                            return TF.tensor3d(transposeMatrixRevert(responseToColumns) as number[][][]);
+                        }
+                        default:
+                            throw `Unknown strategy type ${strategy}`;
+                    }
+                },
+                (reason) => _createError('DATASET_DENORMALIZE_ERROR', reason)
+            )
+        )
+    );
