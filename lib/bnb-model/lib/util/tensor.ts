@@ -24,3 +24,24 @@ export const denormalizeTensor = <TRank extends TF.Rank>(tensor: TF.Tensor<TRank
 export const serializeTensor = (tensor: TF.Tensor): number | number[] | number[][] | number[][][] | number[][][][] | number[][][][][] => tensor.arraySync();
 
 export const parseTensor = <TRank extends TF.Rank>(array: number | number[] | number[][] | number[][][] | number[][][][] | number[][][][][]): TF.Tensor<TRank> => TF.tensor(array);
+
+export const transposeMatrix = <T>(matrix: T[][]): T[][] => {
+    if (!matrix.length || !matrix[0].length) {
+        return matrix;
+    }
+
+    return matrix[0].map((_, colIndex) => matrix.map((row) => row[colIndex]));
+};
+
+export const transposeMatrixRevert = <T>(matrix: T[][]): T[][] => {
+    if (!matrix.length || !matrix[0].length) {
+        return matrix;
+    }
+    // TODO: change it to normal realization
+    let result = matrix;
+    for (let i = 0; i < 3; i++) {
+        result = transposeMatrix(result);
+    }
+
+    return result;
+};

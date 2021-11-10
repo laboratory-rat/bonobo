@@ -7,7 +7,7 @@
   "module": "commonjs",
   "scripts": {
     "pack:all": "node scripts/pack_all.js",
-    "test": "mocha --require ts-node/register ./test/**/*.ts",
+    "test": "ts-mocha -p ./tsconfig.json --paths ./test/**/*.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "docs": "typedoc --options typedoc.json --excludeExternals",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "@types/expect": "^24.3.0",
     "@types/lodash": "^4.14.168",
-    "@types/mocha": "^8.2.1",
+    "@types/mocha": "^8.2.3",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "@typescript-eslint/parser": "^4.17.0",
     "cp-file": "^9.0.0",

@@ -30,7 +30,7 @@ export interface TrainResults {
     normalization: ModelNormalizationData;
 }
 
-export type ErrorTypeModel = 'MODEL_CREATE_ERROR' | 'MODEL_SERIALIZE_ERROR' | 'MODEL_PARSE_ERROR' | 'MODEL_CLONE_ERROR' | 'MODEL_VALIDATION_ERROR' | 'MODEL_COMPILE_ERROR' | 'MODEL_SPLIT_TO_LAYERS_ERROR' | 'MODEL_TRAIN_ERROR';
+export type ErrorTypeModel = 'MODEL_CREATE_ERROR' | 'MODEL_SERIALIZE_ERROR' | 'MODEL_PARSE_ERROR' | 'MODEL_CLONE_ERROR' | 'MODEL_VALIDATION_ERROR' | 'MODEL_COMPILE_ERROR' | 'MODEL_SPLIT_TO_LAYERS_ERROR' | 'MODEL_TRAIN_ERROR' | 'MODEL_PREDICT_ERROR';
 
 const _createError = (type: ErrorTypeModel, message: unknown, innerError?: ERR) => createError(type, message, innerError);
 
@@ -314,7 +314,7 @@ export const compileModel = (model: Model, optimizer: Optimizer): Either<ERR, TF
                             tfModel.compile({
                                 optimizer,
                                 metrics: ['accuracy'],
-                                loss: 'categoricalCrossentropy',
+                                loss: TF.losses.meanSquaredError,
                             });
 
                             return tfModel;
@@ -327,26 +327,20 @@ export const compileModel = (model: Model, optimizer: Optimizer): Either<ERR, TF
     );
 
 const _checkTrainModelArgument = <TItem, TResult>(item: TItem, argumentName: string, callback: (TItem) => TResult): Either<ERR, TResult> => pipe(item, fromNullable(_createError('MODEL_TRAIN_ERROR', `Argument ${argumentName} is null`)), map(callback));
+const _decreaseTensorFrom3To2 = (input: TF.Tensor3D): TF.Tensor2D => TF.tensor2d(input.arraySync().map((row) => row.reduce((result, col) => [...result, ...col], [])));
 
-export const trainModel = (props: {
-    model: TF.LayersModel;
-    optimizer: Optimizer;
-    options: TrainOptions;
-    input: TF.Tensor<TF.Rank.R3>;
-    label: TF.Tensor<TF.Rank.R3>;
-    callbacks?: { batchEnd: (batch: number, logs: TF.Logs | undefined) => Promise<void> | undefined; onTrainEnd: (logs: TF.Logs | undefined) => Promise<void> | undefined };
-}): TE.TaskEither<ERR, { model: TF.LayersModel; history: TF.History }> =>
+export const trainModel = (props: { model: TF.LayersModel; options: TrainOptions; input: TF.Tensor<TF.Rank.R3>; label: TF.Tensor<TF.Rank.R3>; callbacks?: { batchEnd: (batch: number, logs: TF.Logs | undefined) => Promise<void> | undefined; onTrainEnd: (logs: TF.Logs | undefined) => Promise<void> | undefined } }): TE.TaskEither<ERR, { model: TF.LayersModel; history: TF.History }> =>
     pipe(
         _checkTrainModelArgument<TF.LayersModel, { model: TF.LayersModel }>(props.model, 'model', (model: TF.LayersModel) => ({ model })),
-        chain((payload) => _checkTrainModelArgument<Optimizer, { model: TF.LayersModel; optimizer: Optimizer }>(props.optimizer, 'optimizer', (optimizer: Optimizer) => ({ optimizer, ...payload }))),
-        chain((payload) => _checkTrainModelArgument<TrainOptions, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions }>(props.options, 'train options', (trainOptions) => ({ trainOptions, ...payload }))),
-        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3> }>(props.input, 'input', (input) => ({ input, ...payload }))),
-        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; optimizer: Optimizer; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3>; label: TF.Tensor<TF.Rank.R3> }>(props.label, 'label', (label) => ({ label, ...payload }))),
+        chain((payload) => _checkTrainModelArgument<TrainOptions, { model: TF.LayersModel; trainOptions: TrainOptions }>(props.options, 'train options', (trainOptions) => ({ trainOptions, ...payload }))),
+        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3> }>(props.input, 'input', (input) => ({ input, ...payload }))),
+        chain((payload) => _checkTrainModelArgument<TF.Tensor<TF.Rank.R3>, { model: TF.LayersModel; trainOptions: TrainOptions; input: TF.Tensor<TF.Rank.R3>; label: TF.Tensor<TF.Rank.R3> }>(props.label, 'label', (label) => ({ label, ...payload }))),
         TE.fromEither,
-        TE.chain(({ model, optimizer, trainOptions, input, label }) =>
+        TE.chain(({ model, trainOptions, input, label }) =>
             TE.tryCatch(
                 async () => {
-                    const history = await model.fit(input, label, {
+                    model.summary();
+                    const history = await model.fit(_decreaseTensorFrom3To2(input), _decreaseTensorFrom3To2(label), {
                         batchSize: trainOptions.batchSize,
                         epochs: trainOptions.epochsCount,
                         shuffle: trainOptions.shuffleDataset,
@@ -368,4 +362,25 @@ export const trainModel = (props: {
                     })
             )
         )
+    );
+
+export const modelPredict = ({ model, input, labelShape }: { model: TF.LayersModel; input: number[][][]; labelShape: [number, number, number] }): Either<ERR, TF.Tensor3D> =>
+    pipe(
+        model,
+        fromNullable(_createError('MODEL_PREDICT_ERROR', 'Model is null')),
+        chain((model) =>
+            tryCatch(
+                () => model.predict(_decreaseTensorFrom3To2(TF.tensor3d(input))) as TF.Tensor2D,
+                (error) =>
+                    _createError('MODEL_PREDICT_ERROR', 'Some shit!', {
+                        type: 'MODEL_PREDICT_ERROR',
+                        message: String(error),
+                    } as ERR)
+            )
+        ),
+        map((response) => {
+            const responseMatrix = response.arraySync(); // TODO: НУ И ХУЙНЯ
+            const flattedArray = responseMatrix.reduce((final, row) => [...final, ...row], []);
+            return TF.tensor3d(flattedArray, [flattedArray.length, ...labelShape.slice(1, 3)] as [number, number, number]);
+        })
     );
